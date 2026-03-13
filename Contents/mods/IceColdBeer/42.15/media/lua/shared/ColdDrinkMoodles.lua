@@ -6,7 +6,7 @@ local ICB = {
     MIN_LINGER_HEAT = 0.95,
     COLD_LINGER_HOURS = 1.0,
     MIN_APPLY_RATIO = 0.01,
-    DEBUG = true,
+    DEBUG = false,
     TARGETS = {
         ["Base.BeerBottle"] = { unhappiness = 3.0, boredom = 2.0 },
         ["Base.BeerCan"] = { unhappiness = 3.0, boredom = 2.0 },

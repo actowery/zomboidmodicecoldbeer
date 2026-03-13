@@ -29,6 +29,6 @@ Local testing:
 
 Notes:
 - This project follows the current Build 42 packaging guidance of using versioned mod folders and a `common` folder.
-- Development builds use `modversion=0.y.z` in `mod.info` so the currently loaded build is visible in-game.
+- Release version is `modversion=1.0` in `mod.info`.
 - No open-source license has been added yet. All rights remain with the author unless you choose a license later.
 - This is an unofficial fan-made mod and is not affiliated with The Indie Stone.
