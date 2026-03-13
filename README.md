@@ -2,6 +2,11 @@
 
 A lightweight Project Zomboid Build 42 mod that makes certain drinks feel better when they are actually chilled.
 
+![Ice Cold Beer poster](Contents/mods/IceColdBeer/42.15/poster.png)
+
+Steam Workshop:
+https://steamcommunity.com/sharedfiles/filedetails/?id=3684324175
+
 Supported cold-bonus drinks:
 - Beer
 - White wine and wine cartons
