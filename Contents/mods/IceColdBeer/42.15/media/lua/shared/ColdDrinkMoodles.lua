@@ -1,17 +1,61 @@
 require "TimedActions/ISDrinkFromBottle"
+require "TimedActions/ISDrinkFluidAction"
 
 local ICB = {
-    COLD_THRESHOLD = -0.1,
+    COLD_THRESHOLD = 0.85,
+    MIN_LINGER_HEAT = 0.95,
+    COLD_LINGER_HOURS = 1.0,
+    MIN_APPLY_RATIO = 0.01,
+    DEBUG = true,
     TARGETS = {
-        ["Base.BeerBottle"] = { unhappiness = 2.0, boredom = 1.0 },
-        ["Base.BeerCan"] = { unhappiness = 2.0, boredom = 1.0 },
-        ["Base.BeerImported"] = { unhappiness = 2.0, boredom = 1.0 },
-        ["Base.Wine"] = { unhappiness = 4.0, boredom = 2.0 },
-        ["Base.WineOpen"] = { unhappiness = 4.0, boredom = 2.0 },
+        ["Base.BeerBottle"] = { unhappiness = 3.0, boredom = 2.0 },
+        ["Base.BeerCan"] = { unhappiness = 3.0, boredom = 2.0 },
+        ["Base.BeerImported"] = { unhappiness = 3.0, boredom = 2.0 },
+        ["Base.Wine"] = { unhappiness = 5.0, boredom = 3.0 },
+        ["Base.WineOpen"] = { unhappiness = 5.0, boredom = 3.0 },
+        ["Base.WineBox"] = { unhappiness = 5.0, boredom = 3.0 },
+        ["Base.Champagne"] = { unhappiness = 4.0, boredom = 2.0 },
+        ["Base.Cider"] = { unhappiness = 3.0, boredom = 2.0 },
+        ["Base.Pop"] = { unhappiness = 2.0, boredom = 1.0 },
+        ["Base.Pop2"] = { unhappiness = 2.0, boredom = 1.0 },
+        ["Base.Pop3"] = { unhappiness = 2.0, boredom = 1.0 },
+        ["Base.PopBottle"] = { unhappiness = 3.0, boredom = 1.0 },
+        ["Base.PopBottleRare"] = { unhappiness = 3.0, boredom = 1.0 },
+        ["Base.SodaCan"] = { unhappiness = 2.0, boredom = 1.0 },
+        ["Base.JuiceBox"] = { unhappiness = 2.0, boredom = 1.0 },
+        ["Base.JuiceBoxApple"] = { unhappiness = 2.0, boredom = 1.0 },
+        ["Base.JuiceBoxFruitpunch"] = { unhappiness = 2.0, boredom = 1.0 },
+        ["Base.JuiceBoxOrange"] = { unhappiness = 2.0, boredom = 1.0 },
+        ["Base.JuiceCranberry"] = { unhappiness = 2.0, boredom = 1.0 },
+        ["Base.JuiceFruitpunch"] = { unhappiness = 2.0, boredom = 1.0 },
+        ["Base.JuiceGrape"] = { unhappiness = 2.0, boredom = 1.0 },
+        ["Base.JuiceLemon"] = { unhappiness = 2.0, boredom = 1.0 },
+        ["Base.JuiceOrange"] = { unhappiness = 2.0, boredom = 1.0 },
+        ["Base.JuiceTomato"] = { unhappiness = 2.0, boredom = 1.0 },
+        ["Base.Milk"] = { unhappiness = 2.0, boredom = 1.0 },
+        ["Base.MilkBottle"] = { unhappiness = 2.0, boredom = 1.0 },
+        ["Base.Milk_Personalsized"] = { unhappiness = 1.0, boredom = 1.0 },
+        ["Base.MilkChocolate_Personalsized"] = { unhappiness = 2.0, boredom = 1.0 },
     },
 }
 
 local originalDrink = ISDrinkFromBottle.drink
+local originalDrinkStart = ISDrinkFromBottle.start
+local originalDrinkStop = ISDrinkFromBottle.stop
+local originalFluidDrinkStart = ISDrinkFluidAction.start
+local originalFluidUpdateEat = ISDrinkFluidAction.updateEat
+local originalFluidStop = ISDrinkFluidAction.stop
+local originalFluidPerform = ISDrinkFluidAction.perform
+
+local function debugLog(message)
+    if ICB.DEBUG then
+        print("[IceColdBeer] " .. tostring(message))
+    end
+end
+
+local function formatDebugNumber(value)
+    return string.format("%.2f", tonumber(value) or 0)
+end
 
 local function getConsumeRatio(item, beforeAmount)
     if not item or not item.getFluidContainer then
@@ -34,6 +78,19 @@ local function getConsumeRatio(item, beforeAmount)
     end
 
     return consumed / capacity
+end
+
+local function getCurrentAmount(item)
+    if not item or not item.getFluidContainer then
+        return nil
+    end
+
+    local container = item:getFluidContainer()
+    if not container then
+        return nil
+    end
+
+    return container:getAmount()
 end
 
 local function getRemainingRatio(item)
@@ -59,15 +116,139 @@ local function isFrozen(item)
         return false
     end
 
-    local ok, result = pcall(function()
-        return item:isFrozen()
-    end)
+    local method = item["isFrozen"]
+    if type(method) == "function" then
+        local ok, result = pcall(method, item)
+        return ok and result or false
+    end
 
-    return ok and result or false
+    if type(method) == "boolean" then
+        return method
+    end
+
+    return false
+end
+
+local function getNormalizedHeat(item)
+    if not item then
+        return 1.0
+    end
+
+    local candidates = {
+        "getHeat",
+        "getItemHeat",
+        "getInvHeat",
+    }
+
+    for _, methodName in ipairs(candidates) do
+        local method = item[methodName]
+        if type(method) == "function" then
+            local ok, value = pcall(method, item)
+            if ok and type(value) == "number" then
+                return value
+            end
+        elseif type(method) == "number" then
+            return method
+        end
+    end
+
+    return 1.0
+end
+
+local function getCurrentWorldHours()
+    local gameTime = getGameTime()
+    if gameTime and gameTime.getWorldAgeHours then
+        return gameTime:getWorldAgeHours()
+    end
+
+    return nil
+end
+
+local function getItemModData(item)
+    if not item then
+        return nil
+    end
+
+    local method = item["getModData"]
+    if type(method) == "function" then
+        local ok, result = pcall(method, item)
+        if ok and result then
+            return result
+        end
+    end
+
+    return nil
+end
+
+local function rememberColdState(item)
+    local modData = getItemModData(item)
+    local now = getCurrentWorldHours()
+    if not modData or not now then
+        return
+    end
+
+    modData.icbLastColdHour = now
+end
+
+local function setDrinkSnapshot(item)
+    local modData = getItemModData(item)
+    if not modData then
+        return
+    end
+
+    modData.icbDrinkSnapshotRatio = getRemainingRatio(item)
+    modData.icbDrinkInProgress = true
+end
+
+local function clearDrinkSnapshot(item)
+    local modData = getItemModData(item)
+    if not modData then
+        return
+    end
+
+    modData.icbDrinkSnapshotRatio = nil
+    modData.icbDrinkInProgress = nil
+end
+
+local function isColdEnoughRaw(item)
+    return item and getNormalizedHeat(item) < ICB.COLD_THRESHOLD and not isFrozen(item)
+end
+
+local function isWithinColdLinger(item)
+    local currentHeat = getNormalizedHeat(item)
+    if currentHeat >= ICB.MIN_LINGER_HEAT then
+        return false
+    end
+
+    local modData = getItemModData(item)
+    local now = getCurrentWorldHours()
+    if not modData or not now then
+        return false
+    end
+
+    local lastColdHour = tonumber(modData.icbLastColdHour)
+    if not lastColdHour then
+        return false
+    end
+
+    return (now - lastColdHour) <= ICB.COLD_LINGER_HOURS
 end
 
 local function isColdEnough(item)
-    return item and item:getInvHeat() < ICB.COLD_THRESHOLD and not isFrozen(item)
+    if not item or isFrozen(item) then
+        return false
+    end
+
+    if isColdEnoughRaw(item) then
+        rememberColdState(item)
+        return true
+    end
+
+    return isWithinColdLinger(item)
+end
+
+local function prefersCold(item)
+    return item and ICB.TARGETS[item:getFullType()] ~= nil
 end
 
 local function getScaledBonus(item)
@@ -76,7 +257,13 @@ local function getScaledBonus(item)
         return nil
     end
 
-    local ratio = math.max(0, math.min(1, getRemainingRatio(item)))
+    local ratio = getRemainingRatio(item)
+    local modData = getItemModData(item)
+    if modData and modData.icbDrinkInProgress and type(modData.icbDrinkSnapshotRatio) == "number" then
+        ratio = modData.icbDrinkSnapshotRatio
+    end
+
+    ratio = math.max(0, math.min(1, ratio or 0))
 
     return {
         unhappiness = bonus.unhappiness * ratio,
@@ -84,31 +271,112 @@ local function getScaledBonus(item)
     }
 end
 
-local function applyMoodBonus(character, item, ratio)
+local function applyMoodBonus(character, item, ratio, options)
     if not character or not item or ratio <= 0 then
+        debugLog("skip applyMoodBonus: missing character/item or empty ratio")
         return
     end
 
+    if ratio < ICB.MIN_APPLY_RATIO then
+        return
+    end
+
+    options = options or {}
     local bonus = item and ICB.TARGETS[item:getFullType()]
-    if not bonus or not isColdEnough(item) then
+    local coldAtUse = options.forceCold == true or isColdEnough(item)
+    if not bonus or not coldAtUse then
+        if item then
+            debugLog("skip applyMoodBonus: " .. item:getFullType() .. " cold=" .. tostring(coldAtUse) .. " ratio=" .. tostring(ratio))
+        end
         return
     end
 
     local stats = character:getStats()
     if not stats then
+        debugLog("skip applyMoodBonus: missing stats")
         return
     end
 
+    local appliedUnhappiness = 0
+    local appliedBoredom = 0
+    local beforeUnhappiness = stats:get(CharacterStat.UNHAPPINESS)
+    local beforeBoredom = stats:get(CharacterStat.BOREDOM)
+
     if bonus.unhappiness and bonus.unhappiness > 0 then
-        stats:remove(CharacterStat.UNHAPPINESS, bonus.unhappiness * ratio)
+        appliedUnhappiness = bonus.unhappiness * ratio
+        stats:remove(CharacterStat.UNHAPPINESS, appliedUnhappiness)
     end
 
     if bonus.boredom and bonus.boredom > 0 then
-        stats:remove(CharacterStat.BOREDOM, bonus.boredom * ratio)
+        appliedBoredom = bonus.boredom * ratio
+        stats:remove(CharacterStat.BOREDOM, appliedBoredom)
+    end
+
+    local afterUnhappiness = stats:get(CharacterStat.UNHAPPINESS)
+    local afterBoredom = stats:get(CharacterStat.BOREDOM)
+
+    if options.summary then
+        options.summary.totalUnhappiness = (options.summary.totalUnhappiness or 0) + appliedUnhappiness
+        options.summary.totalBoredom = (options.summary.totalBoredom or 0) + appliedBoredom
+        options.summary.totalRatio = (options.summary.totalRatio or 0) + ratio
+        options.summary.appliedSteps = (options.summary.appliedSteps or 0) + 1
+        options.summary.lastUnhappiness = afterUnhappiness
+        options.summary.lastBoredom = afterBoredom
+    else
+        debugLog(
+            "applied bonus " .. item:getFullType() ..
+            " ratio=" .. formatDebugNumber(ratio) ..
+            " heat=" .. formatDebugNumber(options.heatOverride or getNormalizedHeat(item)) ..
+            " frozen=" .. tostring(isFrozen(item)) ..
+            " unhappinessBonus=" .. formatDebugNumber(appliedUnhappiness) ..
+            " boredomBonus=" .. formatDebugNumber(appliedBoredom) ..
+            " unhappiness=" .. formatDebugNumber(beforeUnhappiness) .. "->" .. formatDebugNumber(afterUnhappiness) ..
+            " boredom=" .. formatDebugNumber(beforeBoredom) .. "->" .. formatDebugNumber(afterBoredom)
+        )
     end
 end
 
+local function logActionState(prefix, item, extra)
+    if not ICB.DEBUG then
+        return
+    end
+
+    local itemType = item and item:getFullType() or "nil"
+    local amount = getCurrentAmount(item)
+    local message = prefix ..
+        " item=" .. itemType ..
+        " amount=" .. formatDebugNumber(amount) ..
+        " heat=" .. formatDebugNumber(getNormalizedHeat(item)) ..
+        " cold=" .. tostring(isColdEnough(item)) ..
+        " frozen=" .. tostring(isFrozen(item))
+
+    if extra and extra ~= "" then
+        message = message .. " " .. extra
+    end
+
+    debugLog(message)
+end
+
+function ISDrinkFromBottle:start()
+    setDrinkSnapshot(self.item)
+    logActionState("ISDrinkFromBottle.start", self.item)
+    originalDrinkStart(self)
+end
+
+function ISDrinkFromBottle:stop()
+    clearDrinkSnapshot(self.item)
+    originalDrinkStop(self)
+end
+
 function ISDrinkFromBottle:drink(food, percentage)
+    local coldAtStart = isColdEnough(food)
+    local heatAtStart = getNormalizedHeat(food)
+    logActionState(
+        "ISDrinkFromBottle.drink.before",
+        food,
+        "percentage=" .. formatDebugNumber(percentage) ..
+        " coldAtStart=" .. tostring(coldAtStart)
+    )
     local beforeAmount = nil
 
     if food and food.getFluidContainer and food:getFluidContainer() then
@@ -118,14 +386,109 @@ function ISDrinkFromBottle:drink(food, percentage)
     originalDrink(self, food, percentage)
 
     if beforeAmount then
-        applyMoodBonus(self.character, food, getConsumeRatio(food, beforeAmount))
+        local ratio = getConsumeRatio(food, beforeAmount)
+        logActionState(
+            "ISDrinkFromBottle.drink.after",
+            food,
+            "consumedRatio=" .. formatDebugNumber(ratio) ..
+            " coldAtStart=" .. tostring(coldAtStart)
+        )
+        applyMoodBonus(self.character, food, ratio, { forceCold = coldAtStart, heatOverride = heatAtStart })
     end
 end
 
-if not isServer() then
-    require "ISUI/ISToolTipInv"
-    require "Entity/ISUI/Controls/ISItemSlot"
+function ISDrinkFluidAction:start()
+    self.icbColdAtStart = isColdEnough(self.item)
+    self.icbHeatAtStart = getNormalizedHeat(self.item)
+    self.icbAppliedConsumedRatio = 0
+    self.icbPendingRatio = 0
+    setDrinkSnapshot(self.item)
+    self.icbSummary = {
+        beforeUnhappiness = self.character and self.character:getStats() and self.character:getStats():get(CharacterStat.UNHAPPINESS) or 0,
+        beforeBoredom = self.character and self.character:getStats() and self.character:getStats():get(CharacterStat.BOREDOM) or 0,
+        totalUnhappiness = 0,
+        totalBoredom = 0,
+        totalRatio = 0,
+        appliedSteps = 0,
+    }
+    logActionState(
+        "ISDrinkFluidAction.start",
+        self.item,
+        "targetConsumedRatio=" .. formatDebugNumber(self.targetConsumedRatio) ..
+        " coldAtStart=" .. tostring(self.icbColdAtStart)
+    )
+    originalFluidDrinkStart(self)
+end
 
+function ISDrinkFluidAction:stop()
+    clearDrinkSnapshot(self.item)
+    originalFluidStop(self)
+end
+
+local function flushPendingFluidBonus(action, force)
+    if not action then
+        return
+    end
+
+    local pendingRatio = action.icbPendingRatio or 0
+    if pendingRatio <= 0 then
+        return
+    end
+
+    if not force and pendingRatio < ICB.MIN_APPLY_RATIO then
+        return
+    end
+
+    action.icbPendingRatio = 0
+    applyMoodBonus(
+        action.character,
+        action.item,
+        pendingRatio,
+        { forceCold = action.icbColdAtStart, heatOverride = action.icbHeatAtStart, summary = action.icbSummary }
+    )
+end
+
+function ISDrinkFluidAction:updateEat(delta)
+    local beforeRatio = self.consumedRatio or 0
+
+    originalFluidUpdateEat(self, delta)
+
+    local afterRatio = self.consumedRatio or 0
+    local deltaRatio = math.max(0, afterRatio - beforeRatio)
+
+    if deltaRatio > 0 then
+        self.icbAppliedConsumedRatio = (self.icbAppliedConsumedRatio or 0) + deltaRatio
+        self.icbPendingRatio = (self.icbPendingRatio or 0) + deltaRatio
+        flushPendingFluidBonus(self, false)
+    end
+end
+
+function ISDrinkFluidAction:perform()
+    flushPendingFluidBonus(self, true)
+    local summary = self.icbSummary or {}
+    local stats = self.character and self.character:getStats()
+    local afterUnhappiness = stats and stats:get(CharacterStat.UNHAPPINESS) or summary.lastUnhappiness or 0
+    local afterBoredom = stats and stats:get(CharacterStat.BOREDOM) or summary.lastBoredom or 0
+    debugLog(
+        "ISDrinkFluidAction.perform" ..
+        " item=" .. (self.item and self.item:getFullType() or "nil") ..
+        " startHeat=" .. formatDebugNumber(self.icbHeatAtStart) ..
+        " endHeat=" .. formatDebugNumber(getNormalizedHeat(self.item)) ..
+        " coldAtStart=" .. tostring(self.icbColdAtStart) ..
+        " consumedRatio=" .. formatDebugNumber(self.consumedRatio or 0) ..
+        " appliedConsumedRatio=" .. formatDebugNumber(self.icbAppliedConsumedRatio or 0) ..
+        " targetConsumedRatio=" .. formatDebugNumber(self.targetConsumedRatio or 0) ..
+        " appliedSteps=" .. tostring(summary.appliedSteps or 0) ..
+        " totalUnhappinessBonus=" .. formatDebugNumber(summary.totalUnhappiness or 0) ..
+        " totalBoredomBonus=" .. formatDebugNumber(summary.totalBoredom or 0) ..
+        " unhappiness=" .. formatDebugNumber(summary.beforeUnhappiness or 0) .. "->" .. formatDebugNumber(afterUnhappiness) ..
+        " boredom=" .. formatDebugNumber(summary.beforeBoredom or 0) .. "->" .. formatDebugNumber(afterBoredom)
+    )
+    clearDrinkSnapshot(self.item)
+    originalFluidPerform(self)
+end
+
+if not isServer() then
     local function tr(key, fallback)
         local text = getText(key)
         if text == key then
@@ -154,106 +517,144 @@ if not isServer() then
         line:setValue(value, valueColor.r, valueColor.g, valueColor.b, valueColor.a)
     end
 
+    local function addTooltipNote(layout, text, color)
+        local line = layout:addItem()
+        line:setLabel(text, color.r, color.g, color.b, color.a)
+    end
+
     local function appendColdDrinkTooltip(tooltip, item)
-        if not item or not isColdEnough(item) then
+        if not item or not prefersCold(item) then
             return
         end
 
-        local scaledBonus = getScaledBonus(item)
-        if not scaledBonus then
-            return
+        if ICB.DEBUG then
+            local debugKey = table.concat({
+                item:getFullType(),
+                tostring(isColdEnough(item)),
+                tostring(isFrozen(item)),
+                tostring(getNormalizedHeat(item)),
+            }, "|")
+            if ICB.lastTooltipKey ~= debugKey then
+                ICB.lastTooltipKey = debugKey
+                debugLog("tooltip " .. debugKey)
+            end
         end
 
+        local baseY = math.max(5, tooltip:getHeight() - 5)
         local layout = tooltip:beginLayout()
         local labelColor = { r = 1, g = 1, b = 1, a = 1 }
         local coldColor = { r = 0.5, g = 0.8, b = 1, a = 1 }
         local bonusColor = { r = 0.7, g = 1, b = 0.7, a = 1 }
 
-        addTooltipLine(layout, tr("Tooltip_icb_Temperature", "Temperature"), tr("Tooltip_icb_Cold", "Cold"), labelColor, coldColor)
-        addTooltipLine(layout, tr("Tooltip_icb_ColdUnhappinessBonus", "Cold Unhappiness Bonus"), "-" .. formatBonus(scaledBonus.unhappiness), labelColor, bonusColor)
-        addTooltipLine(layout, tr("Tooltip_icb_ColdBoredomBonus", "Cold Boredom Bonus"), "-" .. formatBonus(scaledBonus.boredom), labelColor, bonusColor)
+        if isColdEnough(item) then
+            local scaledBonus = getScaledBonus(item)
+            if not scaledBonus then
+                return
+            end
 
+            addTooltipLine(layout, tr("Tooltip_icb_Temperature", "Temperature"), tr("Tooltip_icb_Cold", "Cold"), labelColor, coldColor)
+            addTooltipLine(layout, tr("Tooltip_icb_ColdUnhappinessBonus", "Cold Unhappiness Bonus"), "-" .. formatBonus(scaledBonus.unhappiness), labelColor, bonusColor)
+            addTooltipLine(layout, tr("Tooltip_icb_ColdBoredomBonus", "Cold Boredom Bonus"), "-" .. formatBonus(scaledBonus.boredom), labelColor, bonusColor)
+        else
+            addTooltipNote(layout, tr("Tooltip_icb_BetterCold", "Better cold."), coldColor)
+        end
+
+        local y = layout:render(5, baseY, tooltip)
+        tooltip:setHeight(y + 5)
         tooltip:endLayout(layout)
     end
 
-    function ISToolTipInv:render()
-        if not ISContextMenu.instance or not ISContextMenu.instance.visibleCheck then
-            local mx = getMouseX() + 24
-            local my = getMouseY() + 24
-            if not self.followMouse then
-                mx = self:getX()
-                my = self:getY()
-                if self.anchorBottomLeft then
-                    mx = self.anchorBottomLeft.x
-                    my = self.anchorBottomLeft.y
+    local function installTooltipHooks()
+        if ICB.tooltipsInstalled then
+            return
+        end
+
+        require "ISUI/ISToolTipInv"
+        require "Entity/ISUI/Controls/ISItemSlot"
+
+        function ISToolTipInv:render()
+            if not ISContextMenu.instance or not ISContextMenu.instance.visibleCheck then
+                local mx = getMouseX() + 24
+                local my = getMouseY() + 24
+                if not self.followMouse then
+                    mx = self:getX()
+                    my = self:getY()
+                    if self.anchorBottomLeft then
+                        mx = self.anchorBottomLeft.x
+                        my = self.anchorBottomLeft.y
+                    end
+                end
+
+                local PADX = 0
+
+                self.tooltip:setX(mx + PADX)
+                self.tooltip:setY(my)
+
+                self.tooltip:setWidth(50)
+                self.tooltip:setMeasureOnly(true)
+                if self.item then
+                    self.item:DoTooltip(self.tooltip)
+                    appendColdDrinkTooltip(self.tooltip, self.item)
+                end
+                self.tooltip:setMeasureOnly(false)
+
+                local myCore = getCore()
+                local maxX = myCore:getScreenWidth()
+                local maxY = myCore:getScreenHeight()
+
+                local tw = self.tooltip:getWidth()
+                local th = self.tooltip:getHeight()
+
+                self.tooltip:setX(math.max(0, math.min(mx + PADX, maxX - tw - 1)))
+                if not self.followMouse and self.anchorBottomLeft then
+                    self.tooltip:setY(math.max(0, math.min(my - th, maxY - th - 1)))
+                else
+                    self.tooltip:setY(math.max(0, math.min(my, maxY - th - 1)))
+                end
+
+                if self.contextMenu and self.contextMenu.joyfocus then
+                    local playerNum = self.contextMenu.player
+                    self.tooltip:setX(getPlayerScreenLeft(playerNum) + 60)
+                    self.tooltip:setY(getPlayerScreenTop(playerNum) + 60)
+                elseif self.contextMenu and self.contextMenu.currentOptionRect then
+                    if self.contextMenu.currentOptionRect.height > 32 then
+                        self:setY(my + self.contextMenu.currentOptionRect.height)
+                    end
+                    self:adjustPositionToAvoidOverlap(self.contextMenu.currentOptionRect)
+                end
+
+                self:setX(self.tooltip:getX() - PADX)
+                self:setY(self.tooltip:getY())
+                self:setWidth(tw + PADX)
+                self:setHeight(th)
+
+                if self.followMouse and self.contextMenu == nil then
+                    self:adjustPositionToAvoidOverlap({ x = mx - 24 * 2, y = my - 24 * 2, width = 24 * 2, height = 24 * 2 })
+                end
+
+                self:drawRect(0, 0, self.width, self.height, self.backgroundColor.a, self.backgroundColor.r, self.backgroundColor.g, self.backgroundColor.b)
+                self:drawRectBorder(0, 0, self.width, self.height, self.borderColor.a, self.borderColor.r, self.borderColor.g, self.borderColor.b)
+                if self.item then
+                    self.item:DoTooltip(self.tooltip)
+                    appendColdDrinkTooltip(self.tooltip, self.item)
                 end
             end
+        end
 
-            local PADX = 0
+        local originalDrawTooltip = ISItemSlot.drawTooltip
 
-            self.tooltip:setX(mx + PADX)
-            self.tooltip:setY(my)
+        ISItemSlot.drawTooltip = function(itemSlot, tooltip)
+            originalDrawTooltip(itemSlot, tooltip)
 
-            self.tooltip:setWidth(50)
-            self.tooltip:setMeasureOnly(true)
-            if self.item then
-                self.item:DoTooltip(self.tooltip)
-                appendColdDrinkTooltip(self.tooltip, self.item)
-            end
-            self.tooltip:setMeasureOnly(false)
-
-            local myCore = getCore()
-            local maxX = myCore:getScreenWidth()
-            local maxY = myCore:getScreenHeight()
-
-            local tw = self.tooltip:getWidth()
-            local th = self.tooltip:getHeight()
-
-            self.tooltip:setX(math.max(0, math.min(mx + PADX, maxX - tw - 1)))
-            if not self.followMouse and self.anchorBottomLeft then
-                self.tooltip:setY(math.max(0, math.min(my - th, maxY - th - 1)))
-            else
-                self.tooltip:setY(math.max(0, math.min(my, maxY - th - 1)))
-            end
-
-            if self.contextMenu and self.contextMenu.joyfocus then
-                local playerNum = self.contextMenu.player
-                self.tooltip:setX(getPlayerScreenLeft(playerNum) + 60)
-                self.tooltip:setY(getPlayerScreenTop(playerNum) + 60)
-            elseif self.contextMenu and self.contextMenu.currentOptionRect then
-                if self.contextMenu.currentOptionRect.height > 32 then
-                    self:setY(my + self.contextMenu.currentOptionRect.height)
-                end
-                self:adjustPositionToAvoidOverlap(self.contextMenu.currentOptionRect)
-            end
-
-            self:setX(self.tooltip:getX() - PADX)
-            self:setY(self.tooltip:getY())
-            self:setWidth(tw + PADX)
-            self:setHeight(th)
-
-            if self.followMouse and self.contextMenu == nil then
-                self:adjustPositionToAvoidOverlap({ x = mx - 24 * 2, y = my - 24 * 2, width = 24 * 2, height = 24 * 2 })
-            end
-
-            self:drawRect(0, 0, self.width, self.height, self.backgroundColor.a, self.backgroundColor.r, self.backgroundColor.g, self.backgroundColor.b)
-            self:drawRectBorder(0, 0, self.width, self.height, self.borderColor.a, self.borderColor.r, self.borderColor.g, self.borderColor.b)
-            if self.item then
-                self.item:DoTooltip(self.tooltip)
-                appendColdDrinkTooltip(self.tooltip, self.item)
+            if itemSlot.resource then
+                appendColdDrinkTooltip(tooltip, itemSlot.resource)
+            elseif itemSlot.storedItem then
+                appendColdDrinkTooltip(tooltip, itemSlot.storedItem)
             end
         end
+
+        ICB.tooltipsInstalled = true
     end
 
-    local originalDrawTooltip = ISItemSlot.drawTooltip
-
-    ISItemSlot.drawTooltip = function(itemSlot, tooltip)
-        originalDrawTooltip(itemSlot, tooltip)
-
-        if itemSlot.resource then
-            appendColdDrinkTooltip(tooltip, itemSlot.resource)
-        elseif itemSlot.storedItem then
-            appendColdDrinkTooltip(tooltip, itemSlot.storedItem)
-        end
-    end
+    Events.OnGameBoot.Add(installTooltipHooks)
 end

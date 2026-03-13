@@ -25,8 +25,10 @@ Project layout:
 Local testing:
 - Active local mod path: `C:\Users\AT\Zomboid\mods\IceColdBeerLocal\42.15`
 - After editing files here, sync the updated contents into that local mod folder before testing in-game
+- See `TESTING.md` for a quick smoke-test checklist and optional debug logging
 
 Notes:
 - This project follows the current Build 42 packaging guidance of using versioned mod folders and a `common` folder.
+- Development builds use `modversion=0.y.z` in `mod.info` so the currently loaded build is visible in-game.
 - No open-source license has been added yet. All rights remain with the author unless you choose a license later.
 - This is an unofficial fan-made mod and is not affiliated with The Indie Stone.
