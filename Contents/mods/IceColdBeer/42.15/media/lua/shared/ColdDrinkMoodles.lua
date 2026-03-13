@@ -514,7 +514,13 @@ if not isServer() then
     local function addTooltipLine(layout, label, value, labelColor, valueColor)
         local line = layout:addItem()
         line:setLabel(label, labelColor.r, labelColor.g, labelColor.b, labelColor.a)
-        line:setValue(value, valueColor.r, valueColor.g, valueColor.b, valueColor.a)
+        if type(line.setValueRightNoPlus) == "function" then
+            line:setValueRightNoPlus(value, valueColor.r, valueColor.g, valueColor.b, valueColor.a)
+        elseif type(line.setValueRight) == "function" then
+            line:setValueRight(value, valueColor.r, valueColor.g, valueColor.b, valueColor.a)
+        else
+            line:setValue(value, valueColor.r, valueColor.g, valueColor.b, valueColor.a)
+        end
     end
 
     local function addTooltipNote(layout, text, color)
