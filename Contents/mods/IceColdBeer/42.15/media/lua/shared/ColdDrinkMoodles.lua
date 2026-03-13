@@ -582,11 +582,11 @@ if not isServer() then
                 return
             end
 
-            local temperatureLabel = tr("Tooltip_icb_Temperature", "Temperature")
+            local temperatureLabel = tr("Tooltip_item_Temperature", tr("Tooltip_icb_Temperature", "Temperature")) .. ":"
             local temperatureValue = tr("Tooltip_icb_Cold", "Cold")
-            local unhappinessLabel = tr("Tooltip_icb_ColdUnhappinessBonus", "Cold Unhappiness Bonus")
+            local unhappinessLabel = tr("Tooltip_icb_ColdUnhappinessBonus", "Cold Unhappiness Bonus") .. ":"
             local unhappinessValue = "-" .. formatBonus(scaledBonus.unhappiness)
-            local boredomLabel = tr("Tooltip_icb_ColdBoredomBonus", "Cold Boredom Bonus")
+            local boredomLabel = tr("Tooltip_icb_ColdBoredomBonus", "Cold Boredom Bonus") .. ":"
             local boredomValue = "-" .. formatBonus(scaledBonus.boredom)
 
             table.insert(widthRows, { label = temperatureLabel, value = temperatureValue })
