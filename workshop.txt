@@ -1,0 +1,8 @@
+version=1
+title=Ice Cold Beer [B42]
+description=A lightweight Build 42 mod that gives supported drinks a small mood boost when they are properly chilled.
+description=
+description=Supported drinks include beer, white wine, champagne, cider, soda, juice, and milk.
+description=Tooltips show when a drink is better cold and display the extra cold bonus once chilled.
+tags=
+visibility=public

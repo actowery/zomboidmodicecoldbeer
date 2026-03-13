@@ -1,0 +1,6 @@
+Tooltip_TR = {
+    Tooltip_icb_Temperature = "Sıcaklık",
+    Tooltip_icb_Cold = "Soğuk",
+    Tooltip_icb_ColdUnhappinessBonus = "Soğuk mutsuzluk bonusu",
+    Tooltip_icb_ColdBoredomBonus = "Soğuk sıkkınlık bonusu",
+}

@@ -1,0 +1,10 @@
+# Project Zomboid local runtime data
+Thumbs.db
+desktop.ini
+
+# Editor settings
+.vscode/
+.idea/
+
+# Optional packaging output
+dist/
