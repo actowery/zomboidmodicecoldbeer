@@ -522,6 +522,35 @@ if not isServer() then
         line:setLabel(text, color.r, color.g, color.b, color.a)
     end
 
+    local function ensureTooltipWidth(tooltip, rows)
+        if not tooltip or not rows or #rows == 0 then
+            return
+        end
+
+        local font = ISToolTip.GetFont()
+        local textManager = getTextManager()
+        if not font or not textManager then
+            return
+        end
+
+        local maxLabelWidth = 0
+        local maxValueWidth = 0
+
+        for _, row in ipairs(rows) do
+            if row.label then
+                maxLabelWidth = math.max(maxLabelWidth, textManager:MeasureStringX(font, row.label))
+            end
+            if row.value then
+                maxValueWidth = math.max(maxValueWidth, textManager:MeasureStringX(font, row.value))
+            end
+        end
+
+        local requiredWidth = math.ceil(maxLabelWidth + maxValueWidth + 28)
+        if requiredWidth > tooltip:getWidth() then
+            tooltip:setWidth(requiredWidth)
+        end
+    end
+
     local function appendColdDrinkTooltip(tooltip, item)
         if not item or not prefersCold(item) then
             return
@@ -545,6 +574,7 @@ if not isServer() then
         local labelColor = { r = 1, g = 1, b = 1, a = 1 }
         local coldColor = { r = 0.5, g = 0.8, b = 1, a = 1 }
         local bonusColor = { r = 0.7, g = 1, b = 0.7, a = 1 }
+        local widthRows = {}
 
         if isColdEnough(item) then
             local scaledBonus = getScaledBonus(item)
@@ -552,9 +582,21 @@ if not isServer() then
                 return
             end
 
-            addTooltipLine(layout, tr("Tooltip_icb_Temperature", "Temperature"), tr("Tooltip_icb_Cold", "Cold"), labelColor, coldColor)
-            addTooltipLine(layout, tr("Tooltip_icb_ColdUnhappinessBonus", "Cold Unhappiness Bonus"), "-" .. formatBonus(scaledBonus.unhappiness), labelColor, bonusColor)
-            addTooltipLine(layout, tr("Tooltip_icb_ColdBoredomBonus", "Cold Boredom Bonus"), "-" .. formatBonus(scaledBonus.boredom), labelColor, bonusColor)
+            local temperatureLabel = tr("Tooltip_icb_Temperature", "Temperature")
+            local temperatureValue = tr("Tooltip_icb_Cold", "Cold")
+            local unhappinessLabel = tr("Tooltip_icb_ColdUnhappinessBonus", "Cold Unhappiness Bonus")
+            local unhappinessValue = "-" .. formatBonus(scaledBonus.unhappiness)
+            local boredomLabel = tr("Tooltip_icb_ColdBoredomBonus", "Cold Boredom Bonus")
+            local boredomValue = "-" .. formatBonus(scaledBonus.boredom)
+
+            table.insert(widthRows, { label = temperatureLabel, value = temperatureValue })
+            table.insert(widthRows, { label = unhappinessLabel, value = unhappinessValue })
+            table.insert(widthRows, { label = boredomLabel, value = boredomValue })
+            ensureTooltipWidth(tooltip, widthRows)
+
+            addTooltipLine(layout, temperatureLabel, temperatureValue, labelColor, coldColor)
+            addTooltipLine(layout, unhappinessLabel, unhappinessValue, labelColor, bonusColor)
+            addTooltipLine(layout, boredomLabel, boredomValue, labelColor, bonusColor)
         else
             addTooltipNote(layout, tr("Tooltip_icb_BetterCold", "Better cold."), coldColor)
         end
