@@ -23,7 +23,27 @@ if not PZAPI.ModOptions.icbPatchedLoad then
 
         for _, option in ipairs(loadedOptions.data) do
             if option.type == "textentry" then
-                option.value = tostring(option.value or "")
+                local fallback = ""
+                if option.id then
+                    local categoryKey, statKey = option.id:match("^(.-)_(unhappiness)$")
+                    if not categoryKey or not statKey then
+                        categoryKey, statKey = option.id:match("^(.-)_(boredom)$")
+                    end
+
+                    if categoryKey and statKey and Config.DEFAULTS.categories[categoryKey] then
+                        fallback = Config.DEFAULTS.categories[categoryKey][statKey]
+                    elseif option.id == "custom_targets_unhappiness" then
+                        fallback = Config.DEFAULTS.custom.unhappiness
+                    elseif option.id == "custom_targets_boredom" then
+                        fallback = Config.DEFAULTS.custom.boredom
+                    end
+                end
+
+                if fallback ~= "" then
+                    option.value = Config.getBoundedIntegerString(option.id, option.value, fallback)
+                else
+                    option.value = tostring(option.value or "")
+                end
             end
         end
     end
@@ -39,7 +59,7 @@ local function addIntegerEntry(optionId, title, defaultValue, tooltip)
         optionId,
         title,
         tostring(defaultValue),
-        tooltip
+        tooltip .. " Allowed range: " .. tostring(Config.MIN_BONUS) .. "-" .. tostring(Config.MAX_BONUS) .. "."
     )
 end
 

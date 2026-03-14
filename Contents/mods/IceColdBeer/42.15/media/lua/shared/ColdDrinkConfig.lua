@@ -3,6 +3,8 @@ IceColdBeerConfig = IceColdBeerConfig or {}
 local Config = IceColdBeerConfig
 
 Config.MOD_OPTIONS_ID = "icecoldbeer"
+Config.MIN_BONUS = 0
+Config.MAX_BONUS = 100
 
 Config.DEFAULTS = {
     categories = {
@@ -60,21 +62,49 @@ local function trim(value)
     return tostring(value or ""):gsub("^%s+", ""):gsub("%s+$", "")
 end
 
-local function clampInteger(value, fallback, minValue, maxValue)
+local function warnInvalidOption(optionId, rawValue, reason, resolvedValue)
+    Config._validationWarnings = Config._validationWarnings or {}
+
+    local warningKey = table.concat({
+        tostring(optionId or ""),
+        tostring(rawValue or ""),
+        tostring(reason or ""),
+        tostring(resolvedValue or ""),
+    }, "|")
+
+    if Config._validationWarnings[warningKey] then
+        return
+    end
+
+    Config._validationWarnings[warningKey] = true
+
+    print(string.format(
+        "[IceColdBeer] invalid option %s=%s (%s); using %s",
+        tostring(optionId or "unknown"),
+        tostring(rawValue),
+        tostring(reason or "invalid"),
+        tostring(resolvedValue)
+    ))
+end
+
+local function parseBoundedInteger(optionId, value, fallback, minValue, maxValue)
     local number = tonumber(value)
     if not number then
-        return fallback
+        warnInvalidOption(optionId, value, "not a number", fallback)
+        return fallback, fallback
     end
 
     number = math.floor(number + 0.5)
     if minValue and number < minValue then
-        return minValue
+        warnInvalidOption(optionId, value, "below minimum", minValue)
+        return minValue, minValue
     end
     if maxValue and number > maxValue then
-        return maxValue
+        warnInvalidOption(optionId, value, "above maximum", maxValue)
+        return maxValue, maxValue
     end
 
-    return number
+    return number, number
 end
 
 local function getOptions()
@@ -119,8 +149,20 @@ function Config.getCategoryBonus(categoryKey)
     local optionIds = Config.getCategoryOptionIds(categoryKey)
 
     return {
-        unhappiness = clampInteger(getOptionValue(options, optionIds.unhappiness), defaults.unhappiness, 0, 20),
-        boredom = clampInteger(getOptionValue(options, optionIds.boredom), defaults.boredom, 0, 20),
+        unhappiness = parseBoundedInteger(
+            optionIds.unhappiness,
+            getOptionValue(options, optionIds.unhappiness),
+            defaults.unhappiness,
+            Config.MIN_BONUS,
+            Config.MAX_BONUS
+        ),
+        boredom = parseBoundedInteger(
+            optionIds.boredom,
+            getOptionValue(options, optionIds.boredom),
+            defaults.boredom,
+            Config.MIN_BONUS,
+            Config.MAX_BONUS
+        ),
     }
 end
 
@@ -148,9 +190,33 @@ function Config.getCustomBonus()
     local options = getOptions()
 
     return {
-        unhappiness = clampInteger(getOptionValue(options, "custom_targets_unhappiness"), Config.DEFAULTS.custom.unhappiness, 0, 20),
-        boredom = clampInteger(getOptionValue(options, "custom_targets_boredom"), Config.DEFAULTS.custom.boredom, 0, 20),
+        unhappiness = parseBoundedInteger(
+            "custom_targets_unhappiness",
+            getOptionValue(options, "custom_targets_unhappiness"),
+            Config.DEFAULTS.custom.unhappiness,
+            Config.MIN_BONUS,
+            Config.MAX_BONUS
+        ),
+        boredom = parseBoundedInteger(
+            "custom_targets_boredom",
+            getOptionValue(options, "custom_targets_boredom"),
+            Config.DEFAULTS.custom.boredom,
+            Config.MIN_BONUS,
+            Config.MAX_BONUS
+        ),
     }
+end
+
+function Config.getBoundedIntegerString(optionId, value, fallback)
+    local boundedValue = parseBoundedInteger(
+        optionId,
+        value,
+        fallback,
+        Config.MIN_BONUS,
+        Config.MAX_BONUS
+    )
+
+    return tostring(boundedValue)
 end
 
 function Config.getParsedCustomTargets()
