@@ -11,6 +11,25 @@ if PZAPI.ModOptions:getOptions(Config.MOD_OPTIONS_ID) then
     return
 end
 
+local originalModOptionsLoad = PZAPI.ModOptions.load
+if not PZAPI.ModOptions.icbPatchedLoad then
+    PZAPI.ModOptions.load = function(self, ...)
+        originalModOptionsLoad(self, ...)
+
+        local loadedOptions = self:getOptions(Config.MOD_OPTIONS_ID)
+        if not loadedOptions or not loadedOptions.data then
+            return
+        end
+
+        for _, option in ipairs(loadedOptions.data) do
+            if option.type == "textentry" then
+                option.value = tostring(option.value or "")
+            end
+        end
+    end
+    PZAPI.ModOptions.icbPatchedLoad = true
+end
+
 local options = PZAPI.ModOptions:create(Config.MOD_OPTIONS_ID, "Ice Cold Beer")
 
 options:addTitle("Cold Bonus Categories")
