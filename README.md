@@ -25,7 +25,7 @@ What it does:
 - Includes English, Spanish, and Turkish tooltip translations
 
 Configurable cold bonus options:
-- Built-in drink groups have separate in-game boredom and unhappiness sliders
+- Built-in drink groups have separate in-game boredom and unhappiness integer entry fields
 - Advanced users can add extra full item IDs, such as `SomeMod.FancySoda`, to a custom cold-target list
 - Custom item IDs use their own configurable boredom and unhappiness values
 - Invalid or non-drink item IDs are safely ignored by the gameplay checks
@@ -43,7 +43,7 @@ Local testing:
 
 Notes:
 - This project follows the current Build 42 packaging guidance of using versioned mod folders and a `common` folder.
-- Current development version is `modversion=1.0.10` in `mod.info`.
+- Current development version is `modversion=1.0.11` in `mod.info`.
 - Known issue: on the current Build 42 UI, the extra cold bonus tooltip values can appear slightly misaligned even though the tooltip logic and mood effects work correctly.
 - No open-source license has been added yet. All rights remain with the author unless you choose a license later.
 - This is an unofficial fan-made mod and is not affiliated with The Indie Stone.

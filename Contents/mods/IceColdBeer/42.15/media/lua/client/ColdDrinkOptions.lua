@@ -15,28 +15,31 @@ local options = PZAPI.ModOptions:create(Config.MOD_OPTIONS_ID, "Ice Cold Beer")
 
 options:addTitle("Cold Bonus Categories")
 
+local function addIntegerEntry(optionId, title, defaultValue, tooltip)
+    options:addTextEntry(
+        optionId,
+        title,
+        tostring(defaultValue),
+        tooltip
+    )
+end
+
 local function addCategoryOptions(categoryKey, title)
     local defaults = Config.DEFAULTS.categories[categoryKey]
     local optionIds = Config.getCategoryOptionIds(categoryKey)
 
-    options:addSlider(
+    addIntegerEntry(
         optionIds.unhappiness,
         title .. " Unhappiness",
-        0,
-        20,
-        1,
         defaults.unhappiness,
-        "How much unhappiness a fully chilled " .. title:lower() .. " drink removes."
+        "Integer value. How much unhappiness a fully chilled " .. title:lower() .. " drink removes."
     )
 
-    options:addSlider(
+    addIntegerEntry(
         optionIds.boredom,
         title .. " Boredom",
-        0,
-        20,
-        1,
         defaults.boredom,
-        "How much boredom a fully chilled " .. title:lower() .. " drink removes."
+        "Integer value. How much boredom a fully chilled " .. title:lower() .. " drink removes."
     )
 end
 
@@ -65,21 +68,15 @@ options:addTextEntry(
     Config.DEFAULTS.custom.ids,
     "Comma-separated full item IDs such as Base.BeerCan or SomeMod.FancySoda."
 )
-options:addSlider(
+addIntegerEntry(
     "custom_targets_unhappiness",
     "Custom Target Unhappiness",
-    0,
-    20,
-    1,
     Config.DEFAULTS.custom.unhappiness,
-    "How much unhappiness a fully chilled custom target drink removes."
+    "Integer value. How much unhappiness a fully chilled custom target drink removes."
 )
-options:addSlider(
+addIntegerEntry(
     "custom_targets_boredom",
     "Custom Target Boredom",
-    0,
-    20,
-    1,
     Config.DEFAULTS.custom.boredom,
-    "How much boredom a fully chilled custom target drink removes."
+    "Integer value. How much boredom a fully chilled custom target drink removes."
 )
