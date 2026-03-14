@@ -51,3 +51,4 @@ Notes:
 Release workflow:
 - Use feature branches for new work and hotfix branches for urgent release fixes.
 - Before shipping, run the short release checklist in `TESTING.md`.
+- Basic Lua unit tests and a GitHub Actions workflow cover the shared config logic on this branch.

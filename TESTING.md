@@ -2,6 +2,13 @@
 
 This mod uses a lightweight smoke-test approach instead of full automation.
 
+## Automated checks
+
+- Basic unit tests live in `tests/test_cold_drink_config.lua`
+- GitHub Actions runs that test file on pushes and pull requests
+- The automated coverage is intentionally small and focused on config parsing, validation, and bonus lookup logic
+- Manual in-game testing is still the primary release gate for UI hooks and timed-action behavior
+
 ## Quick smoke test
 
 1. Start the game with `Ice Cold Beer [B42]` enabled.
