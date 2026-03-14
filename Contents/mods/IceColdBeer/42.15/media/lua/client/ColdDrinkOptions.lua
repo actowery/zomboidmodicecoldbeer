@@ -7,7 +7,7 @@ if not Config or not PZAPI or not PZAPI.ModOptions then
     return
 end
 
-if PZAPI.ModOptions:getOptions(Config.MOD_OPTIONS_ID) then
+if PZAPI.ModOptions.icbRegistered then
     return
 end
 
@@ -51,6 +51,7 @@ if not PZAPI.ModOptions.icbPatchedLoad then
 end
 
 local options = PZAPI.ModOptions:create(Config.MOD_OPTIONS_ID, "Ice Cold Beer")
+PZAPI.ModOptions.icbRegistered = true
 
 options:addTitle("Cold Bonus Categories")
 
