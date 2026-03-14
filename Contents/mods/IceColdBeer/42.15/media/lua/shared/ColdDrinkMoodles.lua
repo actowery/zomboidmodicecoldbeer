@@ -596,6 +596,96 @@ if not isServer() then
         tooltip:endLayout(layout)
     end
 
+    local function patchDrinkContextMenu()
+        require "ISUI/ISInventoryPaneContextMenu"
+
+        if ICB.drinkContextMenuPatched then
+            return
+        end
+
+        ISInventoryPaneContextMenu.doDrinkFluidMenu = function(playerObj, fluidContainer, context)
+            local item = instanceof(fluidContainer, "IsoWorldInventoryObject") and fluidContainer:getItem() or fluidContainer
+            if not item or not item.getFluidContainer then
+                return
+            end
+
+            local itemFluidContainer = item:getFluidContainer()
+            if not itemFluidContainer then
+                return
+            end
+
+            local customMenuOption = item.getCustomMenuOption and item:getCustomMenuOption() or nil
+            local jobType = item.getJobType and item:getJobType() or nil
+            local jobDelta = item.getJobDelta and item:getJobDelta() or 0
+
+            if jobDelta > 0 and (jobType == getText("ContextMenu_Drink") or (customMenuOption and jobType == customMenuOption)) then
+                return
+            end
+
+            local openingRecipe = item:getOpeningRecipe()
+            if not item:isSealed() then
+                openingRecipe = nil
+            end
+            if openingRecipe and getScriptManager():getCraftRecipe(openingRecipe) then
+                openingRecipe = getScriptManager():getCraftRecipe(openingRecipe)
+            else
+                openingRecipe = nil
+            end
+            if openingRecipe then
+                local containers = ISInventoryPaneContextMenu.getContainers(playerObj)
+                local logic = HandcraftLogic.new(playerObj, nil, nil)
+
+                logic:setContainers(containers)
+                logic:setRecipeFromContextClick(openingRecipe, item)
+                if not logic:canPerformCurrentRecipe() then
+                    openingRecipe = nil
+                end
+            end
+
+            local cmd = customMenuOption or getText("ContextMenu_Drink")
+            if openingRecipe then
+                cmd = customMenuOption or getText("ContextMenu_OpenAndDrink")
+            end
+
+            local eatOption = context:addOption(cmd, fluidContainer, nil)
+            eatOption.itemForTexture = item
+
+            if not itemFluidContainer:canPlayerEmpty() and not openingRecipe then
+                local tooltip = ISInventoryPaneContextMenu.addToolTip()
+                eatOption.notAvailable = true
+                tooltip.description = getText("Tooltip_item_sealed")
+                eatOption.toolTip = tooltip
+            elseif playerObj:getMoodles():getMoodleLevel(MoodleType.FOOD_EATEN) >= 3 and itemFluidContainer:getProperties():getHungerChange() ~= 0 then
+                local tooltip = ISInventoryPaneContextMenu.addToolTip()
+                eatOption.notAvailable = true
+                tooltip.description = getText("Tooltip_CantEatMore")
+                eatOption.toolTip = tooltip
+            elseif itemFluidContainer:getCapacity() > 3.0 then
+                local tooltip = ISInventoryPaneContextMenu.addToolTip()
+                eatOption.notAvailable = true
+                tooltip.description = getText("Tooltip_CantDrinkFrom")
+                eatOption.toolTip = tooltip
+            else
+                local subMenuEat = context:getNew(context)
+                context:addSubMenu(eatOption, subMenuEat)
+                subMenuEat:addOption(getText("ContextMenu_Eat_All"), fluidContainer, ISInventoryPaneContextMenu.onDrinkFluid, 1, playerObj, openingRecipe, item)
+
+                local capacity = itemFluidContainer:getCapacity()
+                local amount = itemFluidContainer:getAmount()
+                local baseThirst = amount / capacity
+                if baseThirst >= 0.5 then
+                    subMenuEat:addOption(getText("ContextMenu_Eat_Half"), fluidContainer, ISInventoryPaneContextMenu.onDrinkFluid, 0.5, playerObj, openingRecipe, item)
+                end
+                if baseThirst >= 0.25 then
+                    subMenuEat:addOption(getText("ContextMenu_Eat_Quarter"), fluidContainer, ISInventoryPaneContextMenu.onDrinkFluid, 0.25, playerObj, openingRecipe, item)
+                end
+            end
+        end
+
+        ICB.drinkContextMenuPatched = true
+        debugLog("drink context menu patched version=" .. ICB.VERSION)
+    end
+
     local function installTooltipHooks()
         if ICB.tooltipsInstalled then
             return
@@ -689,5 +779,6 @@ if not isServer() then
         debugLog("tooltip hooks installed version=" .. ICB.VERSION)
     end
 
+    Events.OnGameBoot.Add(patchDrinkContextMenu)
     Events.OnGameBoot.Add(installTooltipHooks)
 end
