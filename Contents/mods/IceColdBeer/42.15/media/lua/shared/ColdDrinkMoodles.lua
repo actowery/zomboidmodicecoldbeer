@@ -498,28 +498,10 @@ if not isServer() then
         return string.format("%.1f", rounded)
     end
 
-    local function trySetTooltipValue(line, methodName, value, valueColor)
-        local method = line and line[methodName]
-        if type(method) ~= "function" then
-            return false
-        end
-
-        local ok = pcall(method, line, value, valueColor.r, valueColor.g, valueColor.b, valueColor.a)
-        if ok then
-            return true
-        end
-
-        ok = pcall(method, line, value)
-        return ok
-    end
-
     local function addTooltipLine(layout, label, value, labelColor, valueColor)
         local line = layout:addItem()
         line:setLabel(label, labelColor.r, labelColor.g, labelColor.b, labelColor.a)
-        if not trySetTooltipValue(line, "setValueRightNoPlus", value, valueColor)
-            and not trySetTooltipValue(line, "setValueRight", value, valueColor) then
-            line:setValue(value, valueColor.r, valueColor.g, valueColor.b, valueColor.a)
-        end
+        line:setValue(value, valueColor.r, valueColor.g, valueColor.b, valueColor.a)
     end
 
     local function addTooltipNote(layout, text, color)
