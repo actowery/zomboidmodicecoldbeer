@@ -8,7 +8,7 @@ local ICB = {
     COLD_LINGER_HOURS = 1.0,
     MIN_APPLY_RATIO = 0.01,
     VERSION = "1.0.9",
-    DEBUG = true,
+    DEBUG = false,
 }
 
 local Config = IceColdBeerConfig
