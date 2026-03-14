@@ -49,6 +49,53 @@ With debug enabled, the console will log:
 - exact boredom and unhappiness bonus amounts
 - boredom and unhappiness values before and after drinking
 
+## Test item spawn script
+
+Paste this into the in-game Lua console to add one of each built-in supported drink to your inventory:
+
+```lua
+local player = getPlayer()
+if player then
+    local inv = player:getInventory()
+    local items = {
+        "Base.BeerBottle",
+        "Base.BeerCan",
+        "Base.BeerImported",
+        "Base.Wine",
+        "Base.WineOpen",
+        "Base.WineBox",
+        "Base.Champagne",
+        "Base.Cider",
+        "Base.Pop",
+        "Base.Pop2",
+        "Base.Pop3",
+        "Base.PopBottle",
+        "Base.PopBottleRare",
+        "Base.SodaCan",
+        "Base.JuiceBox",
+        "Base.JuiceBoxApple",
+        "Base.JuiceBoxFruitpunch",
+        "Base.JuiceBoxOrange",
+        "Base.JuiceCranberry",
+        "Base.JuiceFruitpunch",
+        "Base.JuiceGrape",
+        "Base.JuiceLemon",
+        "Base.JuiceOrange",
+        "Base.JuiceTomato",
+        "Base.Milk",
+        "Base.MilkBottle",
+        "Base.Milk_Personalsized",
+        "Base.MilkChocolate_Personalsized",
+    }
+
+    for _, fullType in ipairs(items) do
+        inv:AddItem(fullType)
+    end
+
+    player:Say("Spawned Ice Cold Beer test drinks.")
+end
+```
+
 ## Config options smoke test
 
 1. Open the in-game Mods options screen and find `Ice Cold Beer`.
