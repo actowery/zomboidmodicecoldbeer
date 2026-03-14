@@ -7,7 +7,8 @@ local ICB = {
     MIN_LINGER_HEAT = 0.95,
     COLD_LINGER_HOURS = 1.0,
     MIN_APPLY_RATIO = 0.01,
-    DEBUG = false,
+    VERSION = "1.0.9",
+    DEBUG = true,
 }
 
 local Config = IceColdBeerConfig
@@ -25,6 +26,8 @@ local function debugLog(message)
         print("[IceColdBeer] " .. tostring(message))
     end
 end
+
+debugLog("loaded version=" .. ICB.VERSION .. " debug=" .. tostring(ICB.DEBUG))
 
 local function formatDebugNumber(value)
     return string.format("%.2f", tonumber(value) or 0)
@@ -683,6 +686,7 @@ if not isServer() then
         end
 
         ICB.tooltipsInstalled = true
+        debugLog("tooltip hooks installed version=" .. ICB.VERSION)
     end
 
     Events.OnGameBoot.Add(installTooltipHooks)
