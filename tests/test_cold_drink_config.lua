@@ -60,24 +60,35 @@ local function loadConfig(values, warningBuffer)
     return IceColdBeerConfig
 end
 
-local warnings = {}
-local Config = loadConfig({}, warnings)
+local testCount = 0
 
-do
+local function runTest(name, fn)
+    io.write("[PASS] " .. name .. "\n")
+    testCount = testCount + 1
+    fn()
+end
+
+runTest("category option ids are stable", function()
+    local warnings = {}
+    local Config = loadConfig({}, warnings)
+
     local ids = Config.getCategoryOptionIds("beer")
     assertEqual(ids.unhappiness, "beer_unhappiness", "beer unhappiness option id should match")
     assertEqual(ids.boredom, "beer_boredom", "beer boredom option id should match")
-end
+end)
 
-do
+runTest("default category bonuses are used when no options exist", function()
+    local warnings = {}
+    local Config = loadConfig({}, warnings)
+
     local bonus = Config.getCategoryBonus("beer")
     assertEqual(bonus.unhappiness, 3, "default beer unhappiness should be used")
     assertEqual(bonus.boredom, 2, "default beer boredom should be used")
-end
+end)
 
-do
-    warnings = {}
-    Config = loadConfig({
+runTest("category bonus values clamp to 0-100 and warn", function()
+    local warnings = {}
+    local Config = loadConfig({
         beer_unhappiness = 150,
         beer_boredom = -5,
     }, warnings)
@@ -86,11 +97,11 @@ do
     assertEqual(bonus.unhappiness, 100, "beer unhappiness should clamp to max")
     assertEqual(bonus.boredom, 0, "beer boredom should clamp to min")
     assertTruthy(#warnings >= 2, "out-of-range values should emit warnings")
-end
+end)
 
-do
-    warnings = {}
-    Config = loadConfig({
+runTest("custom bonuses fall back on invalid numeric input", function()
+    local warnings = {}
+    local Config = loadConfig({
         custom_targets_unhappiness = "abc",
         custom_targets_boredom = "17",
     }, warnings)
@@ -99,11 +110,11 @@ do
     assertEqual(bonus.unhappiness, 2, "invalid custom unhappiness should fall back to default")
     assertEqual(bonus.boredom, 17, "valid custom boredom should pass through")
     assertTruthy(#warnings >= 1, "non-numeric custom value should warn")
-end
+end)
 
-do
-    warnings = {}
-    Config = loadConfig({
+runTest("custom target parser accepts comma, semicolon, and newline separators", function()
+    local warnings = {}
+    local Config = loadConfig({
         custom_targets_enabled = true,
         custom_target_ids = " Base.DrinkingGlass, not real ; SomeMod.FancySoda \nBase.BeerCan ",
     }, warnings)
@@ -113,11 +124,11 @@ do
     assertTruthy(parsed["SomeMod.FancySoda"], "custom target parser should allow modded ids")
     assertTruthy(parsed["Base.BeerCan"], "custom target parser should allow multiple delimiters")
     assertEqual(invalid[1], "not real", "custom target parser should return invalid tokens")
-end
+end)
 
-do
-    warnings = {}
-    Config = loadConfig({
+runTest("custom target bonus lookup returns custom metadata", function()
+    local warnings = {}
+    local Config = loadConfig({
         custom_targets_enabled = true,
         custom_target_ids = "Base.DrinkingGlass",
         custom_targets_unhappiness = 9,
@@ -128,21 +139,21 @@ do
     assertEqual(bonus.unhappiness, 9, "custom target unhappiness should be used")
     assertEqual(bonus.boredom, 4, "custom target boredom should be used")
     assertEqual(meta.source, "custom", "custom target metadata should identify custom source")
-end
+end)
 
-do
-    warnings = {}
-    Config = loadConfig({
+runTest("disabled custom targets never match", function()
+    local warnings = {}
+    local Config = loadConfig({
         custom_targets_enabled = false,
         custom_target_ids = "Base.DrinkingGlass",
     }, warnings)
 
     assertFalsey(Config.isCustomTarget("Base.DrinkingGlass"), "disabled custom targets should not match")
-end
+end)
 
-do
-    warnings = {}
-    Config = loadConfig({
+runTest("built-in item type lookup uses category-configured values", function()
+    local warnings = {}
+    local Config = loadConfig({
         beer_unhappiness = 11,
         beer_boredom = 7,
     }, warnings)
@@ -151,15 +162,15 @@ do
     assertEqual(bonus.unhappiness, 11, "category-configured unhappiness should be used")
     assertEqual(bonus.boredom, 7, "category-configured boredom should be used")
     assertEqual(meta.key, "beer", "category metadata should identify the correct key")
-end
+end)
 
-do
-    warnings = {}
-    Config = loadConfig({}, warnings)
+runTest("bounded integer string helper normalizes values", function()
+    local warnings = {}
+    local Config = loadConfig({}, warnings)
 
     assertEqual(Config.getBoundedIntegerString("beer_unhappiness", 101, 3), "100", "bounded integer string should clamp high values")
     assertEqual(Config.getBoundedIntegerString("beer_unhappiness", -4, 3), "0", "bounded integer string should clamp low values")
     assertEqual(Config.getBoundedIntegerString("beer_unhappiness", "oops", 3), "3", "bounded integer string should fall back on invalid input")
-end
+end)
 
-print("Ice Cold Beer config tests passed")
+io.write(string.format("Ice Cold Beer config tests passed (%d checks)\n", testCount))

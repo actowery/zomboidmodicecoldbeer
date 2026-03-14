@@ -22,5 +22,8 @@ jobs:
         with:
           luaVersion: "5.4"
 
+      - name: Show Lua version
+        run: lua -v
+
       - name: Run config tests
         run: lua tests/test_cold_drink_config.lua
