@@ -24,6 +24,10 @@ What it does:
 - Supports an advanced custom item-id allowlist for modded drinks
 - Includes English, Spanish, and Turkish tooltip translations
 
+Compatibility direction:
+- The next feature pass is focused on easier support for mods that add chillable drinks.
+- Pomp's and Vanilla Foods Expanded are current reference examples, but the goal is broader compatibility with mod-added beers and other cold drinks.
+
 Configurable cold bonus options:
 - Built-in drink groups have separate in-game boredom and unhappiness integer entry fields
 - Advanced users can add extra full item IDs, such as `SomeMod.FancySoda`, to a custom cold-target list
@@ -43,7 +47,7 @@ Local testing:
 
 Notes:
 - This project follows the current Build 42 packaging guidance of using versioned mod folders and a `common` folder.
-- Current development version is `modversion=1.0.20` in `mod.info`.
+- Current development version is `modversion=1.1.1` in `mod.info`.
 - Known issue: on the current Build 42 UI, the extra cold bonus tooltip values can appear slightly misaligned even though the tooltip logic and mood effects work correctly.
 - No open-source license has been added yet. All rights remain with the author unless you choose a license later.
 - This is an unofficial fan-made mod and is not affiliated with The Indie Stone.
