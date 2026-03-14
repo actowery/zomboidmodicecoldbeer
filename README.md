@@ -22,6 +22,12 @@ What it does:
 - Shows extra cold-bonus tooltip rows once the drink is properly chilled
 - Includes English, Spanish, and Turkish tooltip translations
 
+Planned feature work:
+- In-game mod options for configuring cold moodle bonuses without editing Lua by hand
+- First implementation target: category-level controls for beer, wine, champagne/cider, soda, juice, and milk
+- Planned integration path: `PZAPI.ModOptions` on Build 42, with safe fallback to current hardcoded defaults if the options API is unavailable
+- See `ROADMAP.md` for the implementation plan and research notes
+
 Project layout:
 - Workshop-style root: `Contents/mods/IceColdBeer`
 - Build-specific mod payload: `Contents/mods/IceColdBeer/42.15`
