@@ -71,12 +71,12 @@ options:addTextEntry(
 addIntegerEntry(
     "custom_targets_unhappiness",
     "Custom Target Unhappiness",
-    Config.DEFAULTS.custom.unhappiness,
+    tostring(Config.DEFAULTS.custom.unhappiness),
     "Integer value. How much unhappiness a fully chilled custom target drink removes."
 )
 addIntegerEntry(
     "custom_targets_boredom",
     "Custom Target Boredom",
-    Config.DEFAULTS.custom.boredom,
+    tostring(Config.DEFAULTS.custom.boredom),
     "Integer value. How much boredom a fully chilled custom target drink removes."
 )
