@@ -1,5 +1,6 @@
 require "TimedActions/ISDrinkFromBottle"
 require "TimedActions/ISDrinkFluidAction"
+require "ColdDrinkConfig"
 
 local ICB = {
     COLD_THRESHOLD = 0.85,
@@ -7,37 +8,9 @@ local ICB = {
     COLD_LINGER_HOURS = 1.0,
     MIN_APPLY_RATIO = 0.01,
     DEBUG = false,
-    TARGETS = {
-        ["Base.BeerBottle"] = { unhappiness = 3.0, boredom = 2.0 },
-        ["Base.BeerCan"] = { unhappiness = 3.0, boredom = 2.0 },
-        ["Base.BeerImported"] = { unhappiness = 3.0, boredom = 2.0 },
-        ["Base.Wine"] = { unhappiness = 5.0, boredom = 3.0 },
-        ["Base.WineOpen"] = { unhappiness = 5.0, boredom = 3.0 },
-        ["Base.WineBox"] = { unhappiness = 5.0, boredom = 3.0 },
-        ["Base.Champagne"] = { unhappiness = 4.0, boredom = 2.0 },
-        ["Base.Cider"] = { unhappiness = 3.0, boredom = 2.0 },
-        ["Base.Pop"] = { unhappiness = 2.0, boredom = 1.0 },
-        ["Base.Pop2"] = { unhappiness = 2.0, boredom = 1.0 },
-        ["Base.Pop3"] = { unhappiness = 2.0, boredom = 1.0 },
-        ["Base.PopBottle"] = { unhappiness = 3.0, boredom = 1.0 },
-        ["Base.PopBottleRare"] = { unhappiness = 3.0, boredom = 1.0 },
-        ["Base.SodaCan"] = { unhappiness = 2.0, boredom = 1.0 },
-        ["Base.JuiceBox"] = { unhappiness = 2.0, boredom = 1.0 },
-        ["Base.JuiceBoxApple"] = { unhappiness = 2.0, boredom = 1.0 },
-        ["Base.JuiceBoxFruitpunch"] = { unhappiness = 2.0, boredom = 1.0 },
-        ["Base.JuiceBoxOrange"] = { unhappiness = 2.0, boredom = 1.0 },
-        ["Base.JuiceCranberry"] = { unhappiness = 2.0, boredom = 1.0 },
-        ["Base.JuiceFruitpunch"] = { unhappiness = 2.0, boredom = 1.0 },
-        ["Base.JuiceGrape"] = { unhappiness = 2.0, boredom = 1.0 },
-        ["Base.JuiceLemon"] = { unhappiness = 2.0, boredom = 1.0 },
-        ["Base.JuiceOrange"] = { unhappiness = 2.0, boredom = 1.0 },
-        ["Base.JuiceTomato"] = { unhappiness = 2.0, boredom = 1.0 },
-        ["Base.Milk"] = { unhappiness = 2.0, boredom = 1.0 },
-        ["Base.MilkBottle"] = { unhappiness = 2.0, boredom = 1.0 },
-        ["Base.Milk_Personalsized"] = { unhappiness = 1.0, boredom = 1.0 },
-        ["Base.MilkChocolate_Personalsized"] = { unhappiness = 2.0, boredom = 1.0 },
-    },
 }
+
+local Config = IceColdBeerConfig
 
 local originalDrink = ISDrinkFromBottle.drink
 local originalDrinkStart = ISDrinkFromBottle.start
@@ -210,6 +183,20 @@ local function clearDrinkSnapshot(item)
     modData.icbDrinkInProgress = nil
 end
 
+local function getBonusDefinition(item)
+    if not item or not Config or not Config.getBonusForItemType then
+        return nil
+    end
+
+    local fullType = item:getFullType()
+    local bonus = Config.getBonusForItemType(fullType)
+    if not bonus then
+        return nil
+    end
+
+    return bonus
+end
+
 local function isColdEnoughRaw(item)
     return item and getNormalizedHeat(item) < ICB.COLD_THRESHOLD and not isFrozen(item)
 end
@@ -248,11 +235,11 @@ local function isColdEnough(item)
 end
 
 local function prefersCold(item)
-    return item and ICB.TARGETS[item:getFullType()] ~= nil and getRemainingRatio(item) > 0
+    return item and getBonusDefinition(item) ~= nil and getRemainingRatio(item) > 0
 end
 
 local function getScaledBonus(item)
-    local bonus = item and ICB.TARGETS[item:getFullType()]
+    local bonus = getBonusDefinition(item)
     if not bonus then
         return nil
     end
@@ -282,7 +269,7 @@ local function applyMoodBonus(character, item, ratio, options)
     end
 
     options = options or {}
-    local bonus = item and ICB.TARGETS[item:getFullType()]
+    local bonus = getBonusDefinition(item)
     local coldAtUse = options.forceCold == true or isColdEnough(item)
     if not bonus or not coldAtUse then
         if item then

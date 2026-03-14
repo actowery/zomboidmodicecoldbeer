@@ -20,13 +20,16 @@ What it does:
 - Adds a small boredom and unhappiness reduction when a supported drink is cold but not frozen
 - Shows a vanilla-style `Better cold.` tooltip note when a supported drink is not chilled enough yet
 - Shows extra cold-bonus tooltip rows once the drink is properly chilled
+- Adds in-game mod options for configuring cold boredom and unhappiness bonuses by drink category
+- Supports an advanced custom item-id allowlist for modded drinks
 - Includes English, Spanish, and Turkish tooltip translations
 
-Planned feature work:
-- In-game mod options for configuring cold moodle bonuses without editing Lua by hand
-- First implementation target: category-level controls for beer, wine, champagne/cider, soda, juice, and milk
-- Planned integration path: `PZAPI.ModOptions` on Build 42, with safe fallback to current hardcoded defaults if the options API is unavailable
-- See `ROADMAP.md` for the implementation plan and research notes
+Configurable cold bonus options:
+- Built-in drink groups have separate in-game boredom and unhappiness sliders
+- Advanced users can add extra full item IDs, such as `SomeMod.FancySoda`, to a custom cold-target list
+- Custom item IDs use their own configurable boredom and unhappiness values
+- Invalid or non-drink item IDs are safely ignored by the gameplay checks
+- See `ROADMAP.md` for follow-up improvements and remaining design questions
 
 Project layout:
 - Workshop-style root: `Contents/mods/IceColdBeer`
@@ -40,7 +43,7 @@ Local testing:
 
 Notes:
 - This project follows the current Build 42 packaging guidance of using versioned mod folders and a `common` folder.
-- Current release version is `modversion=1.0.6` in `mod.info`.
+- Current development version is `modversion=1.0.7` in `mod.info`.
 - Known issue: on the current Build 42 UI, the extra cold bonus tooltip values can appear slightly misaligned even though the tooltip logic and mood effects work correctly.
 - No open-source license has been added yet. All rights remain with the author unless you choose a license later.
 - This is an unofficial fan-made mod and is not affiliated with The Indie Stone.

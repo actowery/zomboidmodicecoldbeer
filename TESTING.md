@@ -48,3 +48,14 @@ With debug enabled, the console will log:
 - whether the item is considered frozen
 - exact boredom and unhappiness bonus amounts
 - boredom and unhappiness values before and after drinking
+
+## Config options smoke test
+
+1. Open the in-game Mods options screen and find `Ice Cold Beer`.
+2. Change one built-in drink category slider and apply the change.
+3. Hover a chilled drink from that category and confirm the tooltip bonus updates to the new value.
+4. Drink that chilled item and confirm the mood effect uses the new configured value.
+5. Enable `Custom Item IDs`.
+6. Enter a comma-separated list such as `Base.BeerCan`.
+7. Change the custom boredom and unhappiness sliders, apply, and confirm that target uses the custom values.
+8. Enter an invalid value such as `not a real item` and confirm the mod does not error or affect unrelated items.

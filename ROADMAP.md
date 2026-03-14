@@ -1,43 +1,36 @@
 # Roadmap
 
-## Next Feature: Configurable Cold Bonuses
+## Current Status
 
-Goal:
-- Let players tune the cold moodle bonuses from the in-game Mods options screen instead of editing Lua files manually.
+Implemented on the current development branch:
+- In-game Build 42 mod options with separate boredom and unhappiness sliders for built-in drink groups
+- Advanced custom item-id support for modded drinks
+- Safe fallback to default shipped values when options are unavailable
 
-Recommended first scope:
-- Add a master enable/disable toggle for custom cold bonuses.
-- Add category-level bonus controls for:
-  - Beer
-  - White wine
-  - Champagne / cider
-  - Soda / pop
-  - Juice
-  - Milk
-- Keep values integer-only to match the current balance direction.
-- Update both tooltip values and applied mood effects to use the configured settings.
+## Next Improvements
 
-Implementation plan:
-1. Add a client-side options file under `Contents/mods/IceColdBeer/42.15/media/lua/client/`.
-2. Create a mod options panel with `PZAPI.ModOptions:create("icecoldbeer", "Ice Cold Beer")`.
-3. Use tick boxes / combo boxes for integer values rather than freeform text input.
-4. Add a small shared helper in the cold-bonus logic that reads configured values first and falls back to current defaults if no option exists.
-5. Rebuild the tooltip rows from the configured values so the player sees the exact active bonus.
-6. Smoke-test both main-menu and in-game application to confirm values persist and affect live drinking behavior.
+### 1. Better Validation Feedback
+- Surface invalid custom item IDs more clearly instead of only ignoring them silently.
+- Possible options:
+  - log invalid entries to `console.txt`
+  - show a short warning note in the options UI
+  - add a debug-only validation dump
 
-Suggested UX:
-- Keep the default release balance as the initial preset.
-- Prefer category-level controls first, not per-item controls, to keep the menu small.
-- If this lands cleanly, a later follow-up can add presets such as `Subtle`, `Default`, and `Strong`.
+### 2. Friendlier Presets
+- Add optional presets such as `Subtle`, `Default`, and `Strong`.
+- Keep the current per-category sliders for advanced users.
 
-Research notes:
-- Build 42 mods on this machine are already using `PZAPI.ModOptions`.
-- Confirmed examples:
-  - `consistent-cooking-names`: creates tick-box options with `PZAPI.ModOptions:create(...)`
-  - `BanditsWeekOne`: creates combo-box options and reads them later with `PZAPI.ModOptions:getOptions(...):getOption(...):getValue()`
-  - `MoreDescriptionForTraits`: shows a practical runtime fallback pattern when options are unavailable
-- This makes `PZAPI.ModOptions` the preferred path for Ice Cold Beer rather than older `ModOptions:getInstance(...)` patterns.
+### 3. Better Custom Target UX
+- Consider splitting custom item IDs into multiple smaller fields or a dedicated advanced panel if the single text entry becomes awkward.
+- Explore whether a future pass should allow per-custom-target values instead of one shared custom bonus pair.
 
-Open questions before implementation:
-- Whether the first pass should expose raw integer values directly or present named presets plus an advanced section.
-- Whether custom values should be purely client-side or mirrored through multiplayer-safe behavior later.
+### 4. Multiplayer Behavior Review
+- Confirm whether client-side option differences need any extra handling in multiplayer contexts.
+- If needed, define a server-authoritative or host-authoritative config story later.
+
+## Research Notes
+
+Local Build 42 references on this machine confirm that `PZAPI.ModOptions` is the preferred implementation path:
+- `consistent-cooking-names`: simple tick-box usage
+- `BanditsWeekOne`: combo-box creation plus runtime reads through `PZAPI.ModOptions:getOptions(...):getOption(...):getValue()`
+- Base game `media/lua/client/PZAPI/ModOptions.lua`: supports `addTextEntry`, `addTickBox`, `addComboBox`, `addSlider`, and related option types
