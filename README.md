@@ -43,7 +43,11 @@ Local testing:
 
 Notes:
 - This project follows the current Build 42 packaging guidance of using versioned mod folders and a `common` folder.
-- Current development version is `modversion=1.0.13` in `mod.info`.
+- Current development version is `modversion=1.0.16` in `mod.info`.
 - Known issue: on the current Build 42 UI, the extra cold bonus tooltip values can appear slightly misaligned even though the tooltip logic and mood effects work correctly.
 - No open-source license has been added yet. All rights remain with the author unless you choose a license later.
 - This is an unofficial fan-made mod and is not affiliated with The Indie Stone.
+
+Release workflow:
+- Use feature branches for new work and hotfix branches for urgent release fixes.
+- Before shipping, run the short release checklist in `TESTING.md`.

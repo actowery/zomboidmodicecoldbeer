@@ -52,10 +52,23 @@ With debug enabled, the console will log:
 ## Config options smoke test
 
 1. Open the in-game Mods options screen and find `Ice Cold Beer`.
-2. Change one built-in drink category slider and apply the change.
+2. Change one built-in drink category value and apply the change.
 3. Hover a chilled drink from that category and confirm the tooltip bonus updates to the new value.
 4. Drink that chilled item and confirm the mood effect uses the new configured value.
 5. Enable `Custom Item IDs`.
 6. Enter a comma-separated list such as `Base.BeerCan`.
-7. Change the custom boredom and unhappiness sliders, apply, and confirm that target uses the custom values.
+7. Change the custom boredom and unhappiness values, apply, and confirm that target uses the custom values.
 8. Enter an invalid value such as `not a real item` and confirm the mod does not error or affect unrelated items.
+
+## Release checklist
+
+1. Confirm the game is loading the intended build by checking `modversion` in the Mods menu.
+2. Verify the mod options page appears and loads without client boot issues.
+3. Change one built-in category value, apply it, and confirm both tooltip and drink effect use the new value.
+4. Test one chilled supported drink and confirm the cold bonus applies.
+5. Test one room-temperature supported drink and confirm the cold bonus does not apply.
+6. Test one custom item ID target and confirm it uses the custom configured values.
+7. Enter at least one invalid or out-of-range text-entry value and confirm it is clamped safely.
+8. Check `console.txt` for any new `IceColdBeer`, Lua, or tooltip-related errors.
+9. Set `DEBUG = false` in the release build before uploading.
+10. Sync the exact tested files into the actual folder the game or Workshop uploader is using.
