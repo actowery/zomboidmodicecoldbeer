@@ -1,0 +1,29 @@
+name: Lua Tests
+
+on:
+  push:
+    branches:
+      - main
+      - feature/**
+      - hotfix/**
+      - release/**
+  pull_request:
+
+jobs:
+  test-config:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Lua
+        uses: leafo/gh-actions-lua@v11
+        with:
+          luaVersion: "5.4"
+
+      - name: Show Lua version
+        run: lua -v
+
+      - name: Run config tests
+        run: lua tests/test_cold_drink_config.lua

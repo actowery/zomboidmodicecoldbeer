@@ -1,43 +1,17 @@
 require "TimedActions/ISDrinkFromBottle"
 require "TimedActions/ISDrinkFluidAction"
+require "ColdDrinkConfig"
 
 local ICB = {
     COLD_THRESHOLD = 0.85,
     MIN_LINGER_HEAT = 0.95,
     COLD_LINGER_HOURS = 1.0,
     MIN_APPLY_RATIO = 0.01,
+    VERSION = "1.0.9",
     DEBUG = false,
-    TARGETS = {
-        ["Base.BeerBottle"] = { unhappiness = 3.0, boredom = 2.0 },
-        ["Base.BeerCan"] = { unhappiness = 3.0, boredom = 2.0 },
-        ["Base.BeerImported"] = { unhappiness = 3.0, boredom = 2.0 },
-        ["Base.Wine"] = { unhappiness = 5.0, boredom = 3.0 },
-        ["Base.WineOpen"] = { unhappiness = 5.0, boredom = 3.0 },
-        ["Base.WineBox"] = { unhappiness = 5.0, boredom = 3.0 },
-        ["Base.Champagne"] = { unhappiness = 4.0, boredom = 2.0 },
-        ["Base.Cider"] = { unhappiness = 3.0, boredom = 2.0 },
-        ["Base.Pop"] = { unhappiness = 2.0, boredom = 1.0 },
-        ["Base.Pop2"] = { unhappiness = 2.0, boredom = 1.0 },
-        ["Base.Pop3"] = { unhappiness = 2.0, boredom = 1.0 },
-        ["Base.PopBottle"] = { unhappiness = 3.0, boredom = 1.0 },
-        ["Base.PopBottleRare"] = { unhappiness = 3.0, boredom = 1.0 },
-        ["Base.SodaCan"] = { unhappiness = 2.0, boredom = 1.0 },
-        ["Base.JuiceBox"] = { unhappiness = 2.0, boredom = 1.0 },
-        ["Base.JuiceBoxApple"] = { unhappiness = 2.0, boredom = 1.0 },
-        ["Base.JuiceBoxFruitpunch"] = { unhappiness = 2.0, boredom = 1.0 },
-        ["Base.JuiceBoxOrange"] = { unhappiness = 2.0, boredom = 1.0 },
-        ["Base.JuiceCranberry"] = { unhappiness = 2.0, boredom = 1.0 },
-        ["Base.JuiceFruitpunch"] = { unhappiness = 2.0, boredom = 1.0 },
-        ["Base.JuiceGrape"] = { unhappiness = 2.0, boredom = 1.0 },
-        ["Base.JuiceLemon"] = { unhappiness = 2.0, boredom = 1.0 },
-        ["Base.JuiceOrange"] = { unhappiness = 2.0, boredom = 1.0 },
-        ["Base.JuiceTomato"] = { unhappiness = 2.0, boredom = 1.0 },
-        ["Base.Milk"] = { unhappiness = 2.0, boredom = 1.0 },
-        ["Base.MilkBottle"] = { unhappiness = 2.0, boredom = 1.0 },
-        ["Base.Milk_Personalsized"] = { unhappiness = 1.0, boredom = 1.0 },
-        ["Base.MilkChocolate_Personalsized"] = { unhappiness = 2.0, boredom = 1.0 },
-    },
 }
+
+local Config = IceColdBeerConfig
 
 local originalDrink = ISDrinkFromBottle.drink
 local originalDrinkStart = ISDrinkFromBottle.start
@@ -52,6 +26,8 @@ local function debugLog(message)
         print("[IceColdBeer] " .. tostring(message))
     end
 end
+
+debugLog("loaded version=" .. ICB.VERSION .. " debug=" .. tostring(ICB.DEBUG))
 
 local function formatDebugNumber(value)
     return string.format("%.2f", tonumber(value) or 0)
@@ -210,6 +186,20 @@ local function clearDrinkSnapshot(item)
     modData.icbDrinkInProgress = nil
 end
 
+local function getBonusDefinition(item)
+    if not item or not Config or not Config.getBonusForItemType then
+        return nil
+    end
+
+    local fullType = item:getFullType()
+    local bonus = Config.getBonusForItemType(fullType)
+    if not bonus then
+        return nil
+    end
+
+    return bonus
+end
+
 local function isColdEnoughRaw(item)
     return item and getNormalizedHeat(item) < ICB.COLD_THRESHOLD and not isFrozen(item)
 end
@@ -248,11 +238,11 @@ local function isColdEnough(item)
 end
 
 local function prefersCold(item)
-    return item and ICB.TARGETS[item:getFullType()] ~= nil and getRemainingRatio(item) > 0
+    return item and getBonusDefinition(item) ~= nil and getRemainingRatio(item) > 0
 end
 
 local function getScaledBonus(item)
-    local bonus = item and ICB.TARGETS[item:getFullType()]
+    local bonus = getBonusDefinition(item)
     if not bonus then
         return nil
     end
@@ -282,7 +272,7 @@ local function applyMoodBonus(character, item, ratio, options)
     end
 
     options = options or {}
-    local bonus = item and ICB.TARGETS[item:getFullType()]
+    local bonus = getBonusDefinition(item)
     local coldAtUse = options.forceCold == true or isColdEnough(item)
     if not bonus or not coldAtUse then
         if item then
@@ -606,6 +596,96 @@ if not isServer() then
         tooltip:endLayout(layout)
     end
 
+    local function patchDrinkContextMenu()
+        require "ISUI/ISInventoryPaneContextMenu"
+
+        if ICB.drinkContextMenuPatched then
+            return
+        end
+
+        ISInventoryPaneContextMenu.doDrinkFluidMenu = function(playerObj, fluidContainer, context)
+            local item = instanceof(fluidContainer, "IsoWorldInventoryObject") and fluidContainer:getItem() or fluidContainer
+            if not item or not item.getFluidContainer then
+                return
+            end
+
+            local itemFluidContainer = item:getFluidContainer()
+            if not itemFluidContainer then
+                return
+            end
+
+            local customMenuOption = item.getCustomMenuOption and item:getCustomMenuOption() or nil
+            local jobType = item.getJobType and item:getJobType() or nil
+            local jobDelta = item.getJobDelta and item:getJobDelta() or 0
+
+            if jobDelta > 0 and (jobType == getText("ContextMenu_Drink") or (customMenuOption and jobType == customMenuOption)) then
+                return
+            end
+
+            local openingRecipe = item:getOpeningRecipe()
+            if not item:isSealed() then
+                openingRecipe = nil
+            end
+            if openingRecipe and getScriptManager():getCraftRecipe(openingRecipe) then
+                openingRecipe = getScriptManager():getCraftRecipe(openingRecipe)
+            else
+                openingRecipe = nil
+            end
+            if openingRecipe then
+                local containers = ISInventoryPaneContextMenu.getContainers(playerObj)
+                local logic = HandcraftLogic.new(playerObj, nil, nil)
+
+                logic:setContainers(containers)
+                logic:setRecipeFromContextClick(openingRecipe, item)
+                if not logic:canPerformCurrentRecipe() then
+                    openingRecipe = nil
+                end
+            end
+
+            local cmd = customMenuOption or getText("ContextMenu_Drink")
+            if openingRecipe then
+                cmd = customMenuOption or getText("ContextMenu_OpenAndDrink")
+            end
+
+            local eatOption = context:addOption(cmd, fluidContainer, nil)
+            eatOption.itemForTexture = item
+
+            if not itemFluidContainer:canPlayerEmpty() and not openingRecipe then
+                local tooltip = ISInventoryPaneContextMenu.addToolTip()
+                eatOption.notAvailable = true
+                tooltip.description = getText("Tooltip_item_sealed")
+                eatOption.toolTip = tooltip
+            elseif playerObj:getMoodles():getMoodleLevel(MoodleType.FOOD_EATEN) >= 3 and itemFluidContainer:getProperties():getHungerChange() ~= 0 then
+                local tooltip = ISInventoryPaneContextMenu.addToolTip()
+                eatOption.notAvailable = true
+                tooltip.description = getText("Tooltip_CantEatMore")
+                eatOption.toolTip = tooltip
+            elseif itemFluidContainer:getCapacity() > 3.0 then
+                local tooltip = ISInventoryPaneContextMenu.addToolTip()
+                eatOption.notAvailable = true
+                tooltip.description = getText("Tooltip_CantDrinkFrom")
+                eatOption.toolTip = tooltip
+            else
+                local subMenuEat = context:getNew(context)
+                context:addSubMenu(eatOption, subMenuEat)
+                subMenuEat:addOption(getText("ContextMenu_Eat_All"), fluidContainer, ISInventoryPaneContextMenu.onDrinkFluid, 1, playerObj, openingRecipe, item)
+
+                local capacity = itemFluidContainer:getCapacity()
+                local amount = itemFluidContainer:getAmount()
+                local baseThirst = amount / capacity
+                if baseThirst >= 0.5 then
+                    subMenuEat:addOption(getText("ContextMenu_Eat_Half"), fluidContainer, ISInventoryPaneContextMenu.onDrinkFluid, 0.5, playerObj, openingRecipe, item)
+                end
+                if baseThirst >= 0.25 then
+                    subMenuEat:addOption(getText("ContextMenu_Eat_Quarter"), fluidContainer, ISInventoryPaneContextMenu.onDrinkFluid, 0.25, playerObj, openingRecipe, item)
+                end
+            end
+        end
+
+        ICB.drinkContextMenuPatched = true
+        debugLog("drink context menu patched version=" .. ICB.VERSION)
+    end
+
     local function installTooltipHooks()
         if ICB.tooltipsInstalled then
             return
@@ -696,7 +776,9 @@ if not isServer() then
         end
 
         ICB.tooltipsInstalled = true
+        debugLog("tooltip hooks installed version=" .. ICB.VERSION)
     end
 
+    Events.OnGameBoot.Add(patchDrinkContextMenu)
     Events.OnGameBoot.Add(installTooltipHooks)
 end
