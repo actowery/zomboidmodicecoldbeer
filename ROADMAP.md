@@ -12,6 +12,7 @@ Implemented on the current development branch:
 ### 1. Better Mod Compatibility For Added Drinks
 - Improve out-of-the-box support for mods that add chillable drinks, especially beers, sodas, juices, and milk-like items.
 - Use Pomp's items and Vanilla Foods Expanded as reference compatibility targets, but keep the implementation general instead of hard-coding only those two mods.
+- An explicit third-party tag contract is now documented in `MODDER_COMPAT.md`.
 - Possible approaches:
   - expand the built-in allowlist with known popular mod drink IDs
   - add smarter heuristics for drinkable fluid containers that look like cold drinks

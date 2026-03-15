@@ -27,6 +27,7 @@ What it does:
 Compatibility direction:
 - The next feature pass is focused on easier support for mods that add chillable drinks.
 - Pomp's and Vanilla Foods Expanded are current reference examples, but the goal is broader compatibility with mod-added beers and other cold drinks.
+- Third-party mod authors can now opt drinks in with Ice Cold Beer tags. See `MODDER_COMPAT.md`.
 
 Configurable cold bonus options:
 - Built-in drink groups have separate in-game boredom and unhappiness integer entry fields
@@ -47,7 +48,7 @@ Local testing:
 
 Notes:
 - This project follows the current Build 42 packaging guidance of using versioned mod folders and a `common` folder.
-- Current development version is `modversion=1.1.1` in `mod.info`.
+- Current development version is `modversion=1.2.0` in `mod.info`.
 - Known issue: on the current Build 42 UI, the extra cold bonus tooltip values can appear slightly misaligned even though the tooltip logic and mood effects work correctly.
 - No open-source license has been added yet. All rights remain with the author unless you choose a license later.
 - This is an unofficial fan-made mod and is not affiliated with The Indie Stone.

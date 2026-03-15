@@ -187,12 +187,11 @@ local function clearDrinkSnapshot(item)
 end
 
 local function getBonusDefinition(item)
-    if not item or not Config or not Config.getBonusForItemType then
+    if not item or not Config or not Config.getBonusForItem then
         return nil
     end
 
-    local fullType = item:getFullType()
-    local bonus = Config.getBonusForItemType(fullType)
+    local bonus = Config.getBonusForItem(item)
     if not bonus then
         return nil
     end

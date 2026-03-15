@@ -16,6 +16,25 @@ local function assertFalsey(value, message)
     end
 end
 
+local function makeTagArray(values)
+    return {
+        toArray = function()
+            return values
+        end,
+    }
+end
+
+local function makeItem(fullType, tags)
+    return {
+        getFullType = function()
+            return fullType
+        end,
+        getTags = function()
+            return makeTagArray(tags or {})
+        end,
+    }
+end
+
 local function optionWithValue(value)
     return {
         getValue = function()
@@ -171,6 +190,72 @@ runTest("bounded integer string helper normalizes values", function()
     assertEqual(Config.getBoundedIntegerString("beer_unhappiness", 101, 3), "100", "bounded integer string should clamp high values")
     assertEqual(Config.getBoundedIntegerString("beer_unhappiness", -4, 3), "0", "bounded integer string should clamp low values")
     assertEqual(Config.getBoundedIntegerString("beer_unhappiness", "oops", 3), "3", "bounded integer string should fall back on invalid input")
+end)
+
+runTest("bettercold tag with category uses category-configured values", function()
+    local warnings = {}
+    local Config = loadConfig({
+        beer_unhappiness = 12,
+        beer_boredom = 8,
+    }, warnings)
+
+    local item = makeItem("SomeMod.CustomBeer", {
+        "icecoldbeer:bettercold",
+        "icecoldbeer:category/beer",
+    })
+
+    local bonus, meta = Config.getBonusForItem(item)
+    assertEqual(bonus.unhappiness, 12, "tagged beer should use configured beer unhappiness")
+    assertEqual(bonus.boredom, 8, "tagged beer should use configured beer boredom")
+    assertEqual(meta.source, "tag", "tagged item metadata should identify tag source")
+end)
+
+runTest("bettercold tag explicit values override category values", function()
+    local warnings = {}
+    local Config = loadConfig({
+        beer_unhappiness = 12,
+        beer_boredom = 8,
+    }, warnings)
+
+    local item = makeItem("SomeMod.CustomBeer", {
+        "icecoldbeer:bettercold",
+        "icecoldbeer:category/beer",
+        "icecoldbeer:unhappiness/4",
+        "icecoldbeer:boredom/1",
+    })
+
+    local bonus = Config.getBonusForItem(item)
+    assertEqual(bonus.unhappiness, 4, "explicit tagged unhappiness should override category")
+    assertEqual(bonus.boredom, 1, "explicit tagged boredom should override category")
+end)
+
+runTest("bettercold tag without category falls back to custom defaults", function()
+    local warnings = {}
+    local Config = loadConfig({}, warnings)
+
+    local item = makeItem("SomeMod.CustomDrink", {
+        "icecoldbeer:bettercold",
+    })
+
+    local bonus = Config.getBonusForItem(item)
+    assertEqual(bonus.unhappiness, 2, "tagged fallback unhappiness should use custom default")
+    assertEqual(bonus.boredom, 1, "tagged fallback boredom should use custom default")
+end)
+
+runTest("bettercold tag values clamp to valid range", function()
+    local warnings = {}
+    local Config = loadConfig({}, warnings)
+
+    local item = makeItem("SomeMod.CustomDrink", {
+        "icecoldbeer:bettercold",
+        "icecoldbeer:unhappiness/500",
+        "icecoldbeer:boredom/-3",
+    })
+
+    local bonus = Config.getBonusForItem(item)
+    assertEqual(bonus.unhappiness, 100, "tagged unhappiness should clamp high values")
+    assertEqual(bonus.boredom, 0, "tagged boredom should clamp low values")
+    assertTruthy(#warnings >= 2, "invalid tagged values should warn")
 end)
 
 io.write(string.format("Ice Cold Beer config tests passed (%d checks)\n", testCount))
