@@ -7,7 +7,7 @@ local ICB = {
     MIN_LINGER_HEAT = 0.95,
     COLD_LINGER_HOURS = 1.0,
     MIN_APPLY_RATIO = 0.01,
-    VERSION = "1.0.9",
+    VERSION = "1.0.8",
     DEBUG = false,
 }
 
@@ -33,22 +33,40 @@ local function formatDebugNumber(value)
     return string.format("%.2f", tonumber(value) or 0)
 end
 
+local function safeCallMethod(object, methodName)
+    if not object then
+        return false, nil
+    end
+
+    local method = object[methodName]
+    if type(method) ~= "function" then
+        return false, nil
+    end
+
+    return pcall(method, object)
+end
+
 local function getConsumeRatio(item, beforeAmount)
-    if not item or not item.getFluidContainer then
+    if not item or type(item.getFluidContainer) ~= "function" then
         return 0
     end
 
-    local container = item:getFluidContainer()
-    if not container then
+    local ok, container = safeCallMethod(item, "getFluidContainer")
+    if not ok or not container then
         return 0
     end
 
-    local capacity = container:getCapacity()
-    if not capacity or capacity <= 0 then
+    local okCapacity, capacity = safeCallMethod(container, "getCapacity")
+    if not okCapacity or not capacity or capacity <= 0 then
         return 0
     end
 
-    local consumed = beforeAmount - container:getAmount()
+    local okAmount, amount = safeCallMethod(container, "getAmount")
+    if not okAmount or type(amount) ~= "number" then
+        return 0
+    end
+
+    local consumed = beforeAmount - amount
     if consumed <= 0 then
         return 0
     end
@@ -57,34 +75,44 @@ local function getConsumeRatio(item, beforeAmount)
 end
 
 local function getCurrentAmount(item)
-    if not item or not item.getFluidContainer then
+    if not item or type(item.getFluidContainer) ~= "function" then
         return nil
     end
 
-    local container = item:getFluidContainer()
-    if not container then
+    local ok, container = safeCallMethod(item, "getFluidContainer")
+    if not ok or not container then
         return nil
     end
 
-    return container:getAmount()
+    local okAmount, amount = safeCallMethod(container, "getAmount")
+    if not okAmount then
+        return nil
+    end
+
+    return amount
 end
 
 local function getRemainingRatio(item)
-    if not item or not item.getFluidContainer then
+    if not item or type(item.getFluidContainer) ~= "function" then
         return 0
     end
 
-    local container = item:getFluidContainer()
-    if not container then
+    local ok, container = safeCallMethod(item, "getFluidContainer")
+    if not ok or not container then
         return 0
     end
 
-    local capacity = container:getCapacity()
-    if not capacity or capacity <= 0 then
+    local okCapacity, capacity = safeCallMethod(container, "getCapacity")
+    if not okCapacity or not capacity or capacity <= 0 then
         return 0
     end
 
-    return container:getAmount() / capacity
+    local okAmount, amount = safeCallMethod(container, "getAmount")
+    if not okAmount or type(amount) ~= "number" then
+        return 0
+    end
+
+    return amount / capacity
 end
 
 local function isFrozen(item)
@@ -191,7 +219,10 @@ local function getBonusDefinition(item)
         return nil
     end
 
-    local bonus = Config.getBonusForItem(item)
+    local ok, bonus = pcall(Config.getBonusForItem, item)
+    if not ok then
+        return nil
+    end
     if not bonus then
         return nil
     end
@@ -237,7 +268,17 @@ local function isColdEnough(item)
 end
 
 local function prefersCold(item)
-    return item and getBonusDefinition(item) ~= nil and getRemainingRatio(item) > 0
+    if not item then
+        return false
+    end
+
+    local bonus = getBonusDefinition(item)
+    if not bonus then
+        return false
+    end
+
+    local ok, ratio = pcall(getRemainingRatio, item)
+    return ok and type(ratio) == "number" and ratio > 0
 end
 
 local function getScaledBonus(item)
