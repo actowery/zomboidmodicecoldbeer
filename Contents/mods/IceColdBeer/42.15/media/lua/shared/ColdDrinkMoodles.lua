@@ -8,7 +8,7 @@ local ICB = {
     COLD_LINGER_HOURS = 1.0,
     COLD_CONTAINER_DELAY_HOURS = 0.5,
     MIN_APPLY_RATIO = 0.01,
-    VERSION = "1.0.12",
+    VERSION = "1.0.13",
     DEBUG = false,
 }
 
@@ -199,6 +199,10 @@ local function getColdContainer(item)
 end
 
 local function isColdContainerType(containerType)
+    if Config and type(Config.isColdContainerType) == "function" then
+        return Config.isColdContainerType(containerType)
+    end
+
     return containerType == "fridge" or containerType == "freezer" or containerType == "icecream"
 end
 
@@ -221,6 +225,42 @@ local function isInPoweredColdContainer(item)
     return true
 end
 
+local function getColdContainerSignature(item)
+    local container = getColdContainer(item)
+    if not container then
+        return nil
+    end
+
+    local parts = {}
+
+    local okType, containerType = safeCallMethod(container, "getType")
+    parts[#parts + 1] = "type=" .. tostring(containerType or "unknown")
+
+    local okContainingItem, containingItem = safeCallMethod(container, "getContainingItem")
+    if okContainingItem and containingItem then
+        local okContainingId, containingId = safeCallMethod(containingItem, "getID")
+        local okContainingType, containingType = safeCallMethod(containingItem, "getFullType")
+        parts[#parts + 1] = "containingId=" .. tostring(containingId or "nil")
+        parts[#parts + 1] = "containingType=" .. tostring(containingType or "nil")
+    end
+
+    local okParent, parent = safeCallMethod(container, "getParent")
+    if okParent and parent then
+        local okX, x = safeCallMethod(parent, "getX")
+        local okY, y = safeCallMethod(parent, "getY")
+        local okZ, z = safeCallMethod(parent, "getZ")
+        local okObjectIndex, objectIndex = safeCallMethod(parent, "getObjectIndex")
+        local okName, objectName = safeCallMethod(parent, "getName")
+        parts[#parts + 1] = "parent=" .. tostring(objectName or parent)
+        parts[#parts + 1] = "x=" .. tostring(okX and x or "nil")
+        parts[#parts + 1] = "y=" .. tostring(okY and y or "nil")
+        parts[#parts + 1] = "z=" .. tostring(okZ and z or "nil")
+        parts[#parts + 1] = "obj=" .. tostring(okObjectIndex and objectIndex or "nil")
+    end
+
+    return table.concat(parts, "|")
+end
+
 local function rememberColdState(item, source)
     local modData = getItemModData(item)
     local now = getCurrentWorldHours()
@@ -239,9 +279,12 @@ local function clearColdContainerState(item)
     end
 
     modData.icbColdContainerStartHour = nil
+    modData.icbColdContainerSignature = nil
 end
 
-local function getColdContainerElapsedHours(item)
+local function getColdContainerElapsedHours(item, options)
+    options = options or {}
+    local mutate = options.mutate ~= false
     local modData = getItemModData(item)
     local now = getCurrentWorldHours()
     if not modData or not now then
@@ -249,31 +292,63 @@ local function getColdContainerElapsedHours(item)
     end
 
     if not isInPoweredColdContainer(item) then
-        clearColdContainerState(item)
+        if mutate then
+            clearColdContainerState(item)
+        end
         return nil
+    end
+
+    local signature = getColdContainerSignature(item)
+    local storedSignature = tostring(modData.icbColdContainerSignature or "")
+    local signatureChanged = signature and storedSignature ~= "" and storedSignature ~= signature
+
+    if signatureChanged then
+        if mutate then
+            modData.icbColdContainerSignature = signature
+            modData.icbColdContainerStartHour = now
+        end
+        return 0
     end
 
     local startHour = tonumber(modData.icbColdContainerStartHour)
     if not startHour then
-        modData.icbColdContainerStartHour = now
+        if mutate then
+            modData.icbColdContainerStartHour = now
+            modData.icbColdContainerSignature = signature
+        end
         return 0
     end
 
     if now < startHour then
-        modData.icbColdContainerStartHour = now
+        if mutate then
+            modData.icbColdContainerStartHour = now
+            modData.icbColdContainerSignature = signature
+        end
         return 0
     end
 
     return now - startHour
 end
 
-local function isColdEnoughFromContainerFallback(item)
-    local elapsedHours = getColdContainerElapsedHours(item)
-    if not elapsedHours then
-        return false
+local function getColdContainerFallbackState(item, options)
+    local elapsedHours = getColdContainerElapsedHours(item, options)
+    if elapsedHours == nil then
+        return {
+            active = false,
+            cold = false,
+            chilling = false,
+            elapsedHours = nil,
+            remainingHours = nil,
+        }
     end
 
-    return elapsedHours >= ICB.COLD_CONTAINER_DELAY_HOURS
+    return {
+        active = true,
+        cold = elapsedHours >= ICB.COLD_CONTAINER_DELAY_HOURS,
+        chilling = elapsedHours < ICB.COLD_CONTAINER_DELAY_HOURS,
+        elapsedHours = elapsedHours,
+        remainingHours = math.max(0, ICB.COLD_CONTAINER_DELAY_HOURS - elapsedHours),
+    }
 end
 
 local function setDrinkSnapshot(item)
@@ -342,24 +417,54 @@ local function isWithinColdLinger(item)
     return modData.icbLastColdSource == "container"
 end
 
-local function isColdEnough(item)
+local function getColdState(item, options)
+    options = options or {}
+    local mutate = options.mutate ~= false
+
     if not item or isFrozen(item) then
-        clearColdContainerState(item)
-        return false
+        if mutate then
+            clearColdContainerState(item)
+        end
+        return { cold = false, source = nil, chilling = false }
     end
 
     if isColdEnoughRaw(item) then
-        clearColdContainerState(item)
-        rememberColdState(item, "heat")
-        return true
+        if mutate then
+            clearColdContainerState(item)
+            rememberColdState(item, "heat")
+        end
+        return { cold = true, source = "heat", chilling = false }
     end
 
-    if isColdEnoughFromContainerFallback(item) then
-        rememberColdState(item, "container")
-        return true
+    local containerState = getColdContainerFallbackState(item, { mutate = mutate })
+    if containerState.cold then
+        if mutate then
+            rememberColdState(item, "container")
+        end
+        return {
+            cold = true,
+            source = "container",
+            chilling = false,
+            elapsedHours = containerState.elapsedHours,
+            remainingHours = containerState.remainingHours,
+        }
     end
 
-    return isWithinColdLinger(item)
+    if isWithinColdLinger(item) then
+        return { cold = true, source = "linger", chilling = false }
+    end
+
+    return {
+        cold = false,
+        source = nil,
+        chilling = containerState.chilling,
+        elapsedHours = containerState.elapsedHours,
+        remainingHours = containerState.remainingHours,
+    }
+end
+
+local function isColdEnough(item, options)
+    return getColdState(item, options).cold
 end
 
 local function prefersCold(item)
@@ -466,13 +571,16 @@ local function logActionState(prefix, item, extra)
         return
     end
 
+    local coldState = getColdState(item, { mutate = false })
     local itemType = item and item:getFullType() or "nil"
     local amount = getCurrentAmount(item)
     local message = prefix ..
         " item=" .. itemType ..
         " amount=" .. formatDebugNumber(amount) ..
         " heat=" .. formatDebugNumber(getNormalizedHeat(item)) ..
-        " cold=" .. tostring(isColdEnough(item)) ..
+        " cold=" .. tostring(coldState.cold) ..
+        " source=" .. tostring(coldState.source) ..
+        " chilling=" .. tostring(coldState.chilling) ..
         " frozen=" .. tostring(isFrozen(item))
 
     if extra and extra ~= "" then
@@ -613,6 +721,14 @@ function ISDrinkFluidAction:perform()
     originalFluidPerform(self)
 end
 
+if IceColdBeerTestHooks then
+    IceColdBeerTestHooks.isColdContainerType = isColdContainerType
+    IceColdBeerTestHooks.getColdContainerSignature = getColdContainerSignature
+    IceColdBeerTestHooks.getColdContainerFallbackState = getColdContainerFallbackState
+    IceColdBeerTestHooks.getColdState = getColdState
+    IceColdBeerTestHooks.isColdEnough = isColdEnough
+end
+
 if not isServer() then
     local function tr(key, fallback)
         local text = getText(key)
@@ -682,9 +798,11 @@ if not isServer() then
         end
 
         if ICB.DEBUG then
+            local coldState = getColdState(item, { mutate = false })
             local debugKey = table.concat({
                 item:getFullType(),
-                tostring(isColdEnough(item)),
+                tostring(coldState.cold),
+                tostring(coldState.chilling),
                 tostring(isFrozen(item)),
                 tostring(getNormalizedHeat(item)),
             }, "|")
@@ -700,8 +818,9 @@ if not isServer() then
         local coldColor = { r = 0.5, g = 0.8, b = 1, a = 1 }
         local bonusColor = { r = 0.7, g = 1, b = 0.7, a = 1 }
         local widthRows = {}
+        local coldState = getColdState(item, { mutate = false })
 
-        if isColdEnough(item) then
+        if coldState.cold then
             local scaledBonus = getScaledBonus(item)
             if not scaledBonus then
                 return
@@ -722,6 +841,8 @@ if not isServer() then
             addTooltipLine(layout, temperatureLabel, temperatureValue, labelColor, coldColor)
             addTooltipLine(layout, unhappinessLabel, unhappinessValue, labelColor, bonusColor)
             addTooltipLine(layout, boredomLabel, boredomValue, labelColor, bonusColor)
+        elseif coldState.chilling then
+            addTooltipNote(layout, tr("Tooltip_icb_Chilling", "Chilling..."), coldColor)
         else
             addTooltipNote(layout, tr("Tooltip_icb_BetterCold", "Better cold."), coldColor)
         end
@@ -821,6 +942,73 @@ if not isServer() then
         debugLog("drink context menu patched version=" .. ICB.VERSION)
     end
 
+    local function forEachContainerItem(container, callback, visitedContainers)
+        if not container or not callback then
+            return
+        end
+
+        visitedContainers = visitedContainers or {}
+        if visitedContainers[container] then
+            return
+        end
+        visitedContainers[container] = true
+
+        local okItems, items = safeCallMethod(container, "getItems")
+        if not okItems or not items then
+            return
+        end
+
+        local size = items:size()
+        for i = 0, size - 1 do
+            local item = items:get(i)
+            callback(item)
+
+            if item and item.IsInventoryContainer and item:IsInventoryContainer() and item.getInventory then
+                local okInventory, nestedInventory = safeCallMethod(item, "getInventory")
+                if okInventory and nestedInventory then
+                    forEachContainerItem(nestedInventory, callback, visitedContainers)
+                end
+            end
+        end
+    end
+
+    local function refreshTrackedItem(item)
+        if not item or not prefersCold(item) then
+            return
+        end
+
+        getColdState(item, { mutate = true })
+    end
+
+    local function refreshKnownColdTracking()
+        local visitedContainers = {}
+
+        local playerObj = getPlayer()
+        if playerObj and playerObj.getInventory then
+            local okInventory, inventory = safeCallMethod(playerObj, "getInventory")
+            if okInventory and inventory then
+                forEachContainerItem(inventory, refreshTrackedItem, visitedContainers)
+            end
+        end
+
+        local playerNum = playerObj and playerObj:getPlayerNum() or 0
+        local inventoryPage = getPlayerInventory and getPlayerInventory(playerNum) or nil
+        local lootPage = getPlayerLoot and getPlayerLoot(playerNum) or nil
+        local pages = { inventoryPage, lootPage }
+
+        for _, page in ipairs(pages) do
+            if page and page.backpacks then
+                for _, button in ipairs(page.backpacks) do
+                    if button and button.inventory then
+                        forEachContainerItem(button.inventory, refreshTrackedItem, visitedContainers)
+                    end
+                end
+            elseif page and page.inventoryPane and page.inventoryPane.inventory then
+                forEachContainerItem(page.inventoryPane.inventory, refreshTrackedItem, visitedContainers)
+            end
+        end
+    end
+
     local function installTooltipHooks()
         if ICB.tooltipsInstalled then
             return
@@ -916,4 +1104,10 @@ if not isServer() then
 
     Events.OnGameBoot.Add(patchDrinkContextMenu)
     Events.OnGameBoot.Add(installTooltipHooks)
+    if Events.OnContainerUpdate then
+        Events.OnContainerUpdate.Add(refreshKnownColdTracking)
+    end
+    if Events.EveryOneMinute then
+        Events.EveryOneMinute.Add(refreshKnownColdTracking)
+    end
 end
