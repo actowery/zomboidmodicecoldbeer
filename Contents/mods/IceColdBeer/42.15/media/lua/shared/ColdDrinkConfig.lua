@@ -9,6 +9,19 @@ Config.TAG_BETTER_COLD = "icecoldbeer:bettercold"
 Config.TAG_CATEGORY_PREFIX = "icecoldbeer:category/"
 Config.TAG_UNHAPPINESS_PREFIX = "icecoldbeer:unhappiness/"
 Config.TAG_BOREDOM_PREFIX = "icecoldbeer:boredom/"
+Config.COLD_CONTAINER_TYPES = {
+    fridge = true,
+    freezer = true,
+    icecream = true,
+}
+Config.COLD_CONTAINER_KEYWORDS = {
+    "fridge",
+    "freezer",
+    "icecream",
+    "refriger",
+    "cooler",
+    "chiller",
+}
 
 Config.DEFAULTS = {
     categories = {
@@ -410,4 +423,23 @@ function Config.getBonusForItem(item)
     end
 
     return nil
+end
+
+function Config.isColdContainerType(containerType)
+    if type(containerType) ~= "string" or containerType == "" then
+        return false
+    end
+
+    local normalized = string.lower(containerType)
+    if Config.COLD_CONTAINER_TYPES[normalized] then
+        return true
+    end
+
+    for _, keyword in ipairs(Config.COLD_CONTAINER_KEYWORDS) do
+        if string.find(normalized, keyword, 1, true) then
+            return true
+        end
+    end
+
+    return false
 end
