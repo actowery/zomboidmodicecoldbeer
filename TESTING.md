@@ -5,11 +5,13 @@ This mod uses a lightweight smoke-test approach instead of full automation.
 ## Automated checks
 
 - Basic unit tests live in `tests/test_cold_drink_config.lua`
+- Moodle-state regression tests live in `tests/test_cold_drink_moodles_state.lua`
 - GitHub Actions runs that test file on pushes and pull requests
 - The automated coverage is intentionally small and focused on config parsing, validation, and bonus lookup logic
 - Manual in-game testing is still the primary release gate for UI hooks and timed-action behavior
 - Local test command on this machine:
   `C:\Users\AT\AppData\Local\Programs\Lua\bin\lua.exe tests/test_cold_drink_config.lua`
+  `C:\Users\AT\AppData\Local\Programs\Lua\bin\lua.exe tests/test_cold_drink_moodles_state.lua`
 
 ## Quick smoke test
 
@@ -26,12 +28,14 @@ This mod uses a lightweight smoke-test approach instead of full automation.
 4. Hover the drink at room temperature.
 5. Confirm the tooltip shows `Better cold.` for supported items.
 6. Put the drink in a working fridge and wait for it to chill.
-7. Hover it again and confirm the tooltip now shows:
+7. Before the chill delay completes, hover it and confirm the tooltip can show `Chilling...` for supported drinks using the fallback path.
+8. Hover it again after the chill delay and confirm the tooltip now shows:
    - `Temperature: Cold`
    - `Cold Unhappiness Bonus`
    - `Cold Boredom Bonus`
-8. Drink it while chilled and verify boredom/unhappiness improve.
-9. Freeze it if possible and confirm the cold bonus no longer applies.
+9. Pick up a fallback-chilled drink from the fridge and confirm it keeps the cold bonus briefly instead of immediately reverting.
+10. Drink it while chilled and verify boredom/unhappiness improve.
+11. Freeze it if possible and confirm the cold bonus no longer applies.
 
 ## Optional debug mode
 
