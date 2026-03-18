@@ -4,19 +4,6 @@ local function assertTruthy(value, message)
     end
 end
 
-local function loadTranslationTable(path, globalName)
-    _G[globalName] = nil
-    local chunk, err = loadfile(path)
-    if not chunk then
-        error(err, 2)
-    end
-
-    chunk()
-    local loaded = _G[globalName]
-    assertTruthy(type(loaded) == "table", path .. " did not define " .. globalName)
-    return loaded
-end
-
 local function collectTooltipKeys(path)
     local handle, err = io.open(path, "r")
     if not handle then
@@ -34,6 +21,24 @@ local function collectTooltipKeys(path)
     return keys
 end
 
+local function loadTranslationTable(path)
+    local handle, err = io.open(path, "r")
+    if not handle then
+        error(err, 2)
+    end
+
+    local contents = handle:read("*a")
+    handle:close()
+
+    local translations = {}
+    for key, value in contents:gmatch('"([^"]+)"%s*:%s*"([^"]*)"') do
+        translations[key] = value
+    end
+
+    assertTruthy(next(translations) ~= nil, path .. " did not contain any translation keys")
+    return translations
+end
+
 local function assertHasKeys(localeName, translations, requiredKeys)
     for key in pairs(requiredKeys) do
         assertTruthy(
@@ -48,25 +53,22 @@ local requiredKeys = collectTooltipKeys("Contents/mods/IceColdBeer/42.15/media/l
 local locales = {
     {
         name = "EN",
-        globalName = "Tooltip_EN",
-        path = "Contents/mods/IceColdBeer/42.15/media/lua/shared/Translate/EN/Tooltip_EN.txt",
+        path = "Contents/mods/IceColdBeer/42.15/media/lua/shared/Translate/EN/Tooltip.json",
     },
     {
         name = "ES",
-        globalName = "Tooltip_ES",
-        path = "Contents/mods/IceColdBeer/42.15/media/lua/shared/Translate/ES/Tooltip_ES.txt",
+        path = "Contents/mods/IceColdBeer/42.15/media/lua/shared/Translate/ES/Tooltip.json",
     },
     {
         name = "TR",
-        globalName = "Tooltip_TR",
-        path = "Contents/mods/IceColdBeer/42.15/media/lua/shared/Translate/TR/Tooltip_TR.txt",
+        path = "Contents/mods/IceColdBeer/42.15/media/lua/shared/Translate/TR/Tooltip.json",
     },
 }
 
 local testCount = 0
 
 for _, locale in ipairs(locales) do
-    local translations = loadTranslationTable(locale.path, locale.globalName)
+    local translations = loadTranslationTable(locale.path)
     assertHasKeys(locale.name, translations, requiredKeys)
     io.write("[PASS] " .. locale.name .. " tooltip translations cover current keys\n")
     testCount = testCount + 1
