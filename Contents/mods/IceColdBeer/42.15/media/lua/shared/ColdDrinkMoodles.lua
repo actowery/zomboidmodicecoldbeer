@@ -6,8 +6,9 @@ local ICB = {
     COLD_THRESHOLD = 0.85,
     MIN_LINGER_HEAT = 0.95,
     COLD_LINGER_HOURS = 1.0,
+    COLD_CONTAINER_DELAY_HOURS = 0.5,
     MIN_APPLY_RATIO = 0.01,
-    VERSION = "1.0.8",
+    VERSION = "1.0.12",
     DEBUG = false,
 }
 
@@ -184,7 +185,43 @@ local function getItemModData(item)
     return nil
 end
 
-local function rememberColdState(item)
+local function getColdContainer(item)
+    if not item then
+        return nil
+    end
+
+    local ok, container = safeCallMethod(item, "getContainer")
+    if not ok or not container then
+        return nil
+    end
+
+    return container
+end
+
+local function isColdContainerType(containerType)
+    return containerType == "fridge" or containerType == "freezer" or containerType == "icecream"
+end
+
+local function isInPoweredColdContainer(item)
+    local container = getColdContainer(item)
+    if not container then
+        return false
+    end
+
+    local okType, containerType = safeCallMethod(container, "getType")
+    if not okType or type(containerType) ~= "string" or not isColdContainerType(containerType) then
+        return false
+    end
+
+    local okPowered, powered = safeCallMethod(container, "isPowered")
+    if okPowered then
+        return powered == true
+    end
+
+    return true
+end
+
+local function rememberColdState(item, source)
     local modData = getItemModData(item)
     local now = getCurrentWorldHours()
     if not modData or not now then
@@ -192,6 +229,51 @@ local function rememberColdState(item)
     end
 
     modData.icbLastColdHour = now
+    modData.icbLastColdSource = source or "heat"
+end
+
+local function clearColdContainerState(item)
+    local modData = getItemModData(item)
+    if not modData then
+        return
+    end
+
+    modData.icbColdContainerStartHour = nil
+end
+
+local function getColdContainerElapsedHours(item)
+    local modData = getItemModData(item)
+    local now = getCurrentWorldHours()
+    if not modData or not now then
+        return nil
+    end
+
+    if not isInPoweredColdContainer(item) then
+        clearColdContainerState(item)
+        return nil
+    end
+
+    local startHour = tonumber(modData.icbColdContainerStartHour)
+    if not startHour then
+        modData.icbColdContainerStartHour = now
+        return 0
+    end
+
+    if now < startHour then
+        modData.icbColdContainerStartHour = now
+        return 0
+    end
+
+    return now - startHour
+end
+
+local function isColdEnoughFromContainerFallback(item)
+    local elapsedHours = getColdContainerElapsedHours(item)
+    if not elapsedHours then
+        return false
+    end
+
+    return elapsedHours >= ICB.COLD_CONTAINER_DELAY_HOURS
 end
 
 local function setDrinkSnapshot(item)
@@ -237,11 +319,6 @@ local function isColdEnoughRaw(item)
 end
 
 local function isWithinColdLinger(item)
-    local currentHeat = getNormalizedHeat(item)
-    if currentHeat >= ICB.MIN_LINGER_HEAT then
-        return false
-    end
-
     local modData = getItemModData(item)
     local now = getCurrentWorldHours()
     if not modData or not now then
@@ -253,16 +330,32 @@ local function isWithinColdLinger(item)
         return false
     end
 
-    return (now - lastColdHour) <= ICB.COLD_LINGER_HOURS
+    if (now - lastColdHour) > ICB.COLD_LINGER_HOURS then
+        return false
+    end
+
+    local currentHeat = getNormalizedHeat(item)
+    if currentHeat < ICB.MIN_LINGER_HEAT then
+        return true
+    end
+
+    return modData.icbLastColdSource == "container"
 end
 
 local function isColdEnough(item)
     if not item or isFrozen(item) then
+        clearColdContainerState(item)
         return false
     end
 
     if isColdEnoughRaw(item) then
-        rememberColdState(item)
+        clearColdContainerState(item)
+        rememberColdState(item, "heat")
+        return true
+    end
+
+    if isColdEnoughFromContainerFallback(item) then
+        rememberColdState(item, "container")
         return true
     end
 
