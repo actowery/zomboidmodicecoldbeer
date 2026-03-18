@@ -5,6 +5,19 @@ local Config = IceColdBeerConfig
 Config.MOD_OPTIONS_ID = "icecoldbeer"
 Config.MIN_BONUS = 0
 Config.MAX_BONUS = 100
+Config.COLD_CONTAINER_TYPES = {
+    fridge = true,
+    freezer = true,
+    icecream = true,
+}
+Config.COLD_CONTAINER_KEYWORDS = {
+    "fridge",
+    "freezer",
+    "icecream",
+    "refriger",
+    "cooler",
+    "chiller",
+}
 
 Config.DEFAULTS = {
     categories = {
@@ -273,4 +286,23 @@ function Config.getBonusForItemType(fullType)
     end
 
     return nil
+end
+
+function Config.isColdContainerType(containerType)
+    if type(containerType) ~= "string" or containerType == "" then
+        return false
+    end
+
+    local normalized = string.lower(containerType)
+    if Config.COLD_CONTAINER_TYPES[normalized] then
+        return true
+    end
+
+    for _, keyword in ipairs(Config.COLD_CONTAINER_KEYWORDS) do
+        if string.find(normalized, keyword, 1, true) then
+            return true
+        end
+    end
+
+    return false
 end
