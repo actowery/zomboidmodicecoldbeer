@@ -5,10 +5,10 @@ require "ColdDrinkConfig"
 local ICB = {
     COLD_THRESHOLD = 0.85,
     MIN_LINGER_HEAT = 0.95,
-    COLD_LINGER_HOURS = 1.0,
-    COLD_CONTAINER_DELAY_HOURS = 0.5,
+    COLD_LINGER_HOURS = 2.0,
+    COLD_CONTAINER_DELAY_HOURS = 0.25,
     MIN_APPLY_RATIO = 0.01,
-    VERSION = "1.0.16",
+    VERSION = "1.0.17",
     DEBUG = false,
 }
 
@@ -233,9 +233,6 @@ local function getColdContainerSignature(item)
 
     local parts = {}
 
-    local okType, containerType = safeCallMethod(container, "getType")
-    parts[#parts + 1] = "type=" .. tostring(containerType or "unknown")
-
     local okContainingItem, containingItem = safeCallMethod(container, "getContainingItem")
     if okContainingItem and containingItem then
         local okContainingId, containingId = safeCallMethod(containingItem, "getID")
@@ -304,6 +301,7 @@ local function getColdContainerElapsedHours(item, options)
 
     if signatureChanged then
         if mutate then
+            debugLog("cold container signature changed; restarting chill timer from " .. storedSignature .. " to " .. tostring(signature))
             modData.icbColdContainerSignature = signature
             modData.icbColdContainerStartHour = now
         end
