@@ -230,10 +230,28 @@ runTest("container fallback becomes cold after delay and stores tracking state",
     assertFalsey(firstState.cold, "initial tracked state should not be cold")
     assertTruthy(firstState.chilling, "initial tracked state should be chilling")
 
-    worldHours = 20.6
+    worldHours = 20.3
     local secondState = Hooks.getColdState(item, { mutate = true })
     assertTruthy(secondState.cold, "item should become cold after enough fridge time")
     assertEqual(secondState.source, "container", "container fallback should report container source")
+end)
+
+runTest("moving between fridge and freezer in the same appliance keeps chill progress", function()
+    local parent = makeParent({ x = 8, y = 9, z = 0, objectIndex = 4, name = "ComboFridge" })
+    local containerFridge = makeContainer({ type = "fridge", powered = true, parent = parent })
+    local containerFreezer = makeContainer({ type = "freezer", powered = true, parent = parent })
+    local item = makeItem({ heat = 1.0, container = containerFridge, modData = {} })
+
+    worldHours = 25
+    Hooks.getColdState(item, { mutate = true })
+
+    worldHours = 25.3
+    item._container = containerFreezer
+    local transferredState = Hooks.getColdState(item, { mutate = true })
+
+    assertFalsey(transferredState.chilling, "same-appliance transfer should not restart chilling")
+    assertTruthy(transferredState.cold, "same-appliance transfer should preserve chill progress")
+    assertEqual(transferredState.source, "container", "same-appliance transfer should keep container cold source")
 end)
 
 runTest("leaving cold storage and re-entering resets the timer", function()
@@ -246,7 +264,7 @@ runTest("leaving cold storage and re-entering resets the timer", function()
     worldHours = 30
     Hooks.getColdState(item, { mutate = true })
 
-    worldHours = 30.6
+    worldHours = 30.3
     Hooks.getColdState(item, { mutate = true })
     assertTruthy(Hooks.getColdState(item, { mutate = false }).cold, "item should be cold in first fridge")
 
@@ -254,7 +272,7 @@ runTest("leaving cold storage and re-entering resets the timer", function()
     local removedState = Hooks.getColdState(item, { mutate = true })
     assertTruthy(removedState.cold, "recently removed item should still use lingering cold")
 
-    worldHours = 31.7
+    worldHours = 32.5
     Hooks.getColdState(item, { mutate = true })
 
     item._container = containerB
@@ -269,7 +287,7 @@ runTest("container sourced linger survives pickup briefly even without heat chan
         heat = 1.0,
         container = nil,
         modData = {
-            icbLastColdHour = 39.5,
+            icbLastColdHour = 38.5,
             icbLastColdSource = "container",
         },
     })
@@ -278,13 +296,28 @@ runTest("container sourced linger survives pickup briefly even without heat chan
     assertTruthy(state.cold, "recent container-derived cold should linger after pickup")
 end)
 
-runTest("heat sourced linger still requires reduced heat", function()
+runTest("container sourced linger expires after tuned sustain window", function()
     worldHours = 50
     local item = makeItem({
         heat = 1.0,
         container = nil,
         modData = {
-            icbLastColdHour = 49.5,
+            icbLastColdHour = 47.9,
+            icbLastColdSource = "container",
+        },
+    })
+
+    local state = Hooks.getColdState(item, { mutate = false })
+    assertFalsey(state.cold, "container-derived linger should expire once sustain window passes")
+end)
+
+runTest("heat sourced linger still requires reduced heat", function()
+    worldHours = 60
+    local item = makeItem({
+        heat = 1.0,
+        container = nil,
+        modData = {
+            icbLastColdHour = 59.5,
             icbLastColdSource = "heat",
         },
     })
