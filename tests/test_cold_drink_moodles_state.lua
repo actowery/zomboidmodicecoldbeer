@@ -254,6 +254,25 @@ runTest("moving between fridge and freezer in the same appliance keeps chill pro
     assertEqual(transferredState.source, "container", "same-appliance transfer should keep container cold source")
 end)
 
+runTest("moving between different powered cold appliances within transfer grace keeps chill progress", function()
+    local parentA = makeParent({ x = 12, y = 10, z = 0, objectIndex = 1, name = "FridgeA" })
+    local parentB = makeParent({ x = 13, y = 10, z = 0, objectIndex = 2, name = "FridgeB" })
+    local containerA = makeContainer({ type = "fridge", powered = true, parent = parentA })
+    local containerB = makeContainer({ type = "fridge", powered = true, parent = parentB })
+    local item = makeItem({ heat = 1.0, container = containerA, modData = {} })
+
+    worldHours = 28
+    Hooks.getColdState(item, { mutate = true })
+
+    worldHours = 28.3
+    item._container = containerB
+    local transferredState = Hooks.getColdState(item, { mutate = true })
+
+    assertFalsey(transferredState.chilling, "cross-appliance cold transfer within grace should not restart chilling")
+    assertTruthy(transferredState.cold, "cross-appliance cold transfer within grace should preserve chill progress")
+    assertEqual(transferredState.source, "container", "cross-appliance cold transfer should keep container cold source")
+end)
+
 runTest("leaving cold storage and re-entering resets the timer", function()
     local parentA = makeParent({ x = 10, y = 10, z = 0, objectIndex = 1, name = "FridgeA" })
     local parentB = makeParent({ x = 11, y = 10, z = 0, objectIndex = 2, name = "FridgeB" })
@@ -279,6 +298,31 @@ runTest("leaving cold storage and re-entering resets the timer", function()
     local readdedState = Hooks.getColdState(item, { mutate = true })
     assertFalsey(readdedState.cold, "re-entering cold storage after linger expires should restart chilling")
     assertTruthy(readdedState.chilling, "re-entered item should restart chilling state")
+end)
+
+runTest("moving to a different powered cold appliance after transfer grace restarts chilling", function()
+    local parentA = makeParent({ x = 14, y = 10, z = 0, objectIndex = 1, name = "FridgeA" })
+    local parentB = makeParent({ x = 15, y = 10, z = 0, objectIndex = 2, name = "FridgeB" })
+    local containerA = makeContainer({ type = "fridge", powered = true, parent = parentA })
+    local containerB = makeContainer({ type = "fridge", powered = true, parent = parentB })
+    local item = makeItem({ heat = 1.0, container = containerA, modData = {} })
+
+    worldHours = 35
+    Hooks.getColdState(item, { mutate = true })
+
+    worldHours = 35.3
+    Hooks.getColdState(item, { mutate = true })
+    assertTruthy(Hooks.getColdState(item, { mutate = false }).cold, "item should be cold before leaving first fridge")
+
+    item._container = nil
+    worldHours = 37.5
+    Hooks.getColdState(item, { mutate = true })
+
+    item._container = containerB
+    local movedState = Hooks.getColdState(item, { mutate = true })
+
+    assertFalsey(movedState.cold, "transfer after grace should restart chilling")
+    assertTruthy(movedState.chilling, "transfer after grace should restart chilling state")
 end)
 
 runTest("container sourced linger survives pickup briefly even without heat change", function()

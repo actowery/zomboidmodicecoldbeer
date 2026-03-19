@@ -7,8 +7,9 @@ local ICB = {
     MIN_LINGER_HEAT = 0.95,
     COLD_LINGER_HOURS = 2.0,
     COLD_CONTAINER_DELAY_HOURS = 0.25,
+    COLD_TRANSFER_GRACE_HOURS = 0.10,
     MIN_APPLY_RATIO = 0.01,
-    VERSION = "1.0.17",
+    VERSION = "1.0.18",
     DEBUG = false,
 }
 
@@ -277,6 +278,7 @@ local function clearColdContainerState(item)
 
     modData.icbColdContainerStartHour = nil
     modData.icbColdContainerSignature = nil
+    modData.icbColdContainerLastSeenHour = nil
 end
 
 local function getColdContainerElapsedHours(item, options)
@@ -288,9 +290,14 @@ local function getColdContainerElapsedHours(item, options)
         return nil
     end
 
+    local startHour = tonumber(modData.icbColdContainerStartHour)
+    local lastSeenHour = tonumber(modData.icbColdContainerLastSeenHour)
+
     if not isInPoweredColdContainer(item) then
         if mutate then
-            clearColdContainerState(item)
+            if not lastSeenHour or (now - lastSeenHour) > ICB.COLD_TRANSFER_GRACE_HOURS then
+                clearColdContainerState(item)
+            end
         end
         return nil
     end
@@ -299,20 +306,35 @@ local function getColdContainerElapsedHours(item, options)
     local storedSignature = tostring(modData.icbColdContainerSignature or "")
     local signatureChanged = signature and storedSignature ~= "" and storedSignature ~= signature
 
+    if signatureChanged and startHour then
+        if mutate then
+            debugLog("cold container signature changed while still refrigerated; preserving chill timer from " .. storedSignature .. " to " .. tostring(signature))
+            modData.icbColdContainerSignature = signature
+            modData.icbColdContainerLastSeenHour = now
+        end
+
+        if now >= startHour then
+            return now - startHour
+        end
+
+        return 0
+    end
+
     if signatureChanged then
         if mutate then
             debugLog("cold container signature changed; restarting chill timer from " .. storedSignature .. " to " .. tostring(signature))
             modData.icbColdContainerSignature = signature
             modData.icbColdContainerStartHour = now
+            modData.icbColdContainerLastSeenHour = now
         end
         return 0
     end
 
-    local startHour = tonumber(modData.icbColdContainerStartHour)
     if not startHour then
         if mutate then
             modData.icbColdContainerStartHour = now
             modData.icbColdContainerSignature = signature
+            modData.icbColdContainerLastSeenHour = now
         end
         return 0
     end
@@ -321,8 +343,13 @@ local function getColdContainerElapsedHours(item, options)
         if mutate then
             modData.icbColdContainerStartHour = now
             modData.icbColdContainerSignature = signature
+            modData.icbColdContainerLastSeenHour = now
         end
         return 0
+    end
+
+    if mutate then
+        modData.icbColdContainerLastSeenHour = now
     end
 
     return now - startHour
