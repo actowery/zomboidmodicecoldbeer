@@ -1,0 +1,9 @@
+{
+    "Tooltip_icb_Temperature": "Temperatura",
+    "Tooltip_icb_Cold": "Frío",
+    "Tooltip_icb_Preference": "Preferencia",
+    "Tooltip_icb_Chilling": "Enfriándose...",
+    "Tooltip_icb_BetterCold": "Mejor frío.",
+    "Tooltip_icb_ColdUnhappinessBonus": "Bonificación de infelicidad por frío",
+    "Tooltip_icb_ColdBoredomBonus": "Bonificación de aburrimiento por frío"
+}

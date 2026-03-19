@@ -29,3 +29,4 @@ jobs:
         run: |
           lua tests/test_cold_drink_config.lua
           lua tests/test_cold_drink_moodles_state.lua
+          lua tests/test_translations.lua

@@ -6,12 +6,14 @@ This mod uses a lightweight smoke-test approach instead of full automation.
 
 - Basic unit tests live in `tests/test_cold_drink_config.lua`
 - Moodle-state regression tests live in `tests/test_cold_drink_moodles_state.lua`
+- Translation coverage tests live in `tests/test_translations.lua` and validate the shipped JSON locale files
 - GitHub Actions runs that test file on pushes and pull requests
 - The automated coverage is intentionally small and focused on config parsing, validation, and bonus lookup logic
 - Manual in-game testing is still the primary release gate for UI hooks and timed-action behavior
 - Local test command on this machine:
   `C:\Users\AT\AppData\Local\Programs\Lua\bin\lua.exe tests/test_cold_drink_config.lua`
   `C:\Users\AT\AppData\Local\Programs\Lua\bin\lua.exe tests/test_cold_drink_moodles_state.lua`
+  `C:\Users\AT\AppData\Local\Programs\Lua\bin\lua.exe tests/test_translations.lua`
 
 ## Quick smoke test
 
