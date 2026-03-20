@@ -5,10 +5,11 @@ require "ColdDrinkConfig"
 local ICB = {
     COLD_THRESHOLD = 0.85,
     MIN_LINGER_HEAT = 0.95,
-    COLD_LINGER_HOURS = 1.0,
-    COLD_CONTAINER_DELAY_HOURS = 0.5,
+    COLD_LINGER_HOURS = 2.0,
+    COLD_CONTAINER_DELAY_HOURS = 0.25,
+    COLD_TRANSFER_GRACE_HOURS = 0.10,
     MIN_APPLY_RATIO = 0.01,
-    VERSION = "1.0.13",
+    VERSION = "1.0.18",
     DEBUG = false,
 }
 
@@ -169,6 +170,18 @@ local function getCurrentWorldHours()
     return nil
 end
 
+local function getTimingHours()
+    if Config and type(Config.getTimingHours) == "function" then
+        return Config.getTimingHours()
+    end
+
+    return {
+        coldContainerDelayHours = ICB.COLD_CONTAINER_DELAY_HOURS,
+        coldLingerHours = ICB.COLD_LINGER_HOURS,
+        coldTransferGraceHours = ICB.COLD_TRANSFER_GRACE_HOURS,
+    }
+end
+
 local function getItemModData(item)
     if not item then
         return nil
@@ -233,9 +246,6 @@ local function getColdContainerSignature(item)
 
     local parts = {}
 
-    local okType, containerType = safeCallMethod(container, "getType")
-    parts[#parts + 1] = "type=" .. tostring(containerType or "unknown")
-
     local okContainingItem, containingItem = safeCallMethod(container, "getContainingItem")
     if okContainingItem and containingItem then
         local okContainingId, containingId = safeCallMethod(containingItem, "getID")
@@ -280,6 +290,7 @@ local function clearColdContainerState(item)
 
     modData.icbColdContainerStartHour = nil
     modData.icbColdContainerSignature = nil
+    modData.icbColdContainerLastSeenHour = nil
 end
 
 local function getColdContainerElapsedHours(item, options)
@@ -287,13 +298,19 @@ local function getColdContainerElapsedHours(item, options)
     local mutate = options.mutate ~= false
     local modData = getItemModData(item)
     local now = getCurrentWorldHours()
+    local timing = getTimingHours()
     if not modData or not now then
         return nil
     end
 
+    local startHour = tonumber(modData.icbColdContainerStartHour)
+    local lastSeenHour = tonumber(modData.icbColdContainerLastSeenHour)
+
     if not isInPoweredColdContainer(item) then
         if mutate then
-            clearColdContainerState(item)
+            if not lastSeenHour or (now - lastSeenHour) > timing.coldTransferGraceHours then
+                clearColdContainerState(item)
+            end
         end
         return nil
     end
@@ -302,19 +319,35 @@ local function getColdContainerElapsedHours(item, options)
     local storedSignature = tostring(modData.icbColdContainerSignature or "")
     local signatureChanged = signature and storedSignature ~= "" and storedSignature ~= signature
 
+    if signatureChanged and startHour then
+        if mutate then
+            debugLog("cold container signature changed while still refrigerated; preserving chill timer from " .. storedSignature .. " to " .. tostring(signature))
+            modData.icbColdContainerSignature = signature
+            modData.icbColdContainerLastSeenHour = now
+        end
+
+        if now >= startHour then
+            return now - startHour
+        end
+
+        return 0
+    end
+
     if signatureChanged then
         if mutate then
+            debugLog("cold container signature changed; restarting chill timer from " .. storedSignature .. " to " .. tostring(signature))
             modData.icbColdContainerSignature = signature
             modData.icbColdContainerStartHour = now
+            modData.icbColdContainerLastSeenHour = now
         end
         return 0
     end
 
-    local startHour = tonumber(modData.icbColdContainerStartHour)
     if not startHour then
         if mutate then
             modData.icbColdContainerStartHour = now
             modData.icbColdContainerSignature = signature
+            modData.icbColdContainerLastSeenHour = now
         end
         return 0
     end
@@ -323,8 +356,13 @@ local function getColdContainerElapsedHours(item, options)
         if mutate then
             modData.icbColdContainerStartHour = now
             modData.icbColdContainerSignature = signature
+            modData.icbColdContainerLastSeenHour = now
         end
         return 0
+    end
+
+    if mutate then
+        modData.icbColdContainerLastSeenHour = now
     end
 
     return now - startHour
@@ -332,6 +370,7 @@ end
 
 local function getColdContainerFallbackState(item, options)
     local elapsedHours = getColdContainerElapsedHours(item, options)
+    local timing = getTimingHours()
     if elapsedHours == nil then
         return {
             active = false,
@@ -344,10 +383,10 @@ local function getColdContainerFallbackState(item, options)
 
     return {
         active = true,
-        cold = elapsedHours >= ICB.COLD_CONTAINER_DELAY_HOURS,
-        chilling = elapsedHours < ICB.COLD_CONTAINER_DELAY_HOURS,
+        cold = elapsedHours >= timing.coldContainerDelayHours,
+        chilling = elapsedHours < timing.coldContainerDelayHours,
         elapsedHours = elapsedHours,
-        remainingHours = math.max(0, ICB.COLD_CONTAINER_DELAY_HOURS - elapsedHours),
+        remainingHours = math.max(0, timing.coldContainerDelayHours - elapsedHours),
     }
 end
 
@@ -394,6 +433,7 @@ end
 local function isWithinColdLinger(item)
     local modData = getItemModData(item)
     local now = getCurrentWorldHours()
+    local timing = getTimingHours()
     if not modData or not now then
         return false
     end
@@ -403,7 +443,7 @@ local function isWithinColdLinger(item)
         return false
     end
 
-    if (now - lastColdHour) > ICB.COLD_LINGER_HOURS then
+    if (now - lastColdHour) > timing.coldLingerHours then
         return false
     end
 

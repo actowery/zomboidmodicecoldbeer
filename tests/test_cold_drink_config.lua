@@ -258,4 +258,43 @@ runTest("bettercold tag values clamp to valid range", function()
     assertTruthy(#warnings >= 2, "invalid tagged values should warn")
 end)
 
+runTest("timing settings use defaults when no options exist", function()
+    local warnings = {}
+    local Config = loadConfig({}, warnings)
+
+    local timing = Config.getTimingSettings()
+    assertEqual(timing.coldContainerDelayMinutes, 15, "default chill delay should be 15 minutes")
+    assertEqual(timing.coldLingerMinutes, 120, "default linger should be 120 minutes")
+    assertEqual(timing.coldTransferGraceMinutes, 6, "default transfer grace should be 6 minutes")
+end)
+
+runTest("timing settings clamp to valid minute range", function()
+    local warnings = {}
+    local Config = loadConfig({
+        cold_container_delay_minutes = -3,
+        cold_linger_minutes = 9999,
+        cold_transfer_grace_minutes = "abc",
+    }, warnings)
+
+    local timing = Config.getTimingSettings()
+    assertEqual(timing.coldContainerDelayMinutes, 0, "chill delay should clamp to minimum")
+    assertEqual(timing.coldLingerMinutes, 720, "linger should clamp to maximum")
+    assertEqual(timing.coldTransferGraceMinutes, 6, "invalid transfer grace should fall back to default")
+    assertTruthy(#warnings >= 3, "invalid timing values should emit warnings")
+end)
+
+runTest("timing hour conversion reflects configured minute values", function()
+    local warnings = {}
+    local Config = loadConfig({
+        cold_container_delay_minutes = 30,
+        cold_linger_minutes = 90,
+        cold_transfer_grace_minutes = 12,
+    }, warnings)
+
+    local timing = Config.getTimingHours()
+    assertEqual(timing.coldContainerDelayHours, 0.5, "30 minutes should convert to 0.5 hours")
+    assertEqual(timing.coldLingerHours, 1.5, "90 minutes should convert to 1.5 hours")
+    assertEqual(timing.coldTransferGraceHours, 0.2, "12 minutes should convert to 0.2 hours")
+end)
+
 io.write(string.format("Ice Cold Beer config tests passed (%d checks)\n", testCount))

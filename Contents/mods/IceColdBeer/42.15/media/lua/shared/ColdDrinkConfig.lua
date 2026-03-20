@@ -9,6 +9,8 @@ Config.TAG_BETTER_COLD = "icecoldbeer:bettercold"
 Config.TAG_CATEGORY_PREFIX = "icecoldbeer:category/"
 Config.TAG_UNHAPPINESS_PREFIX = "icecoldbeer:unhappiness/"
 Config.TAG_BOREDOM_PREFIX = "icecoldbeer:boredom/"
+Config.MIN_TIMING_MINUTES = 0
+Config.MAX_TIMING_MINUTES = 720
 Config.COLD_CONTAINER_TYPES = {
     fridge = true,
     freezer = true,
@@ -41,6 +43,11 @@ Config.DEFAULTS = {
         ids = "",
         unhappiness = 2,
         boredom = 1,
+    },
+    timing = {
+        cold_container_delay_minutes = 15,
+        cold_linger_minutes = 120,
+        cold_transfer_grace_minutes = 6,
     },
 }
 
@@ -109,6 +116,10 @@ local function warnInvalidOption(optionId, rawValue, reason, resolvedValue)
 end
 
 local function parseBoundedInteger(optionId, value, fallback, minValue, maxValue)
+    if value == nil or value == "" then
+        return fallback, fallback
+    end
+
     local number = tonumber(value)
     if not number then
         warnInvalidOption(optionId, value, "not a number", fallback)
@@ -341,6 +352,54 @@ function Config.getBoundedIntegerString(optionId, value, fallback)
     )
 
     return tostring(boundedValue)
+end
+
+function Config.getTimingOptionIds()
+    return {
+        coldContainerDelayMinutes = "cold_container_delay_minutes",
+        coldLingerMinutes = "cold_linger_minutes",
+        coldTransferGraceMinutes = "cold_transfer_grace_minutes",
+    }
+end
+
+function Config.getTimingSettings()
+    local options = getOptions()
+    local ids = Config.getTimingOptionIds()
+    local defaults = Config.DEFAULTS.timing
+
+    return {
+        coldContainerDelayMinutes = parseBoundedInteger(
+            ids.coldContainerDelayMinutes,
+            getOptionValue(options, ids.coldContainerDelayMinutes),
+            defaults.cold_container_delay_minutes,
+            Config.MIN_TIMING_MINUTES,
+            Config.MAX_TIMING_MINUTES
+        ),
+        coldLingerMinutes = parseBoundedInteger(
+            ids.coldLingerMinutes,
+            getOptionValue(options, ids.coldLingerMinutes),
+            defaults.cold_linger_minutes,
+            Config.MIN_TIMING_MINUTES,
+            Config.MAX_TIMING_MINUTES
+        ),
+        coldTransferGraceMinutes = parseBoundedInteger(
+            ids.coldTransferGraceMinutes,
+            getOptionValue(options, ids.coldTransferGraceMinutes),
+            defaults.cold_transfer_grace_minutes,
+            Config.MIN_TIMING_MINUTES,
+            Config.MAX_TIMING_MINUTES
+        ),
+    }
+end
+
+function Config.getTimingHours()
+    local timing = Config.getTimingSettings()
+
+    return {
+        coldContainerDelayHours = timing.coldContainerDelayMinutes / 60,
+        coldLingerHours = timing.coldLingerMinutes / 60,
+        coldTransferGraceHours = timing.coldTransferGraceMinutes / 60,
+    }
 end
 
 function Config.getParsedCustomTargets()

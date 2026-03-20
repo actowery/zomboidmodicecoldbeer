@@ -1,8 +1,0 @@
-Tooltip_EN = {
-    Tooltip_icb_Temperature = "Temperature",
-    Tooltip_icb_Cold = "Cold",
-    Tooltip_icb_Preference = "Preference",
-    Tooltip_icb_BetterCold = "Better cold.",
-    Tooltip_icb_ColdUnhappinessBonus = "Cold Unhappiness Bonus",
-    Tooltip_icb_ColdBoredomBonus = "Cold Boredom Bonus",
-}
