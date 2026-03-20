@@ -9,7 +9,7 @@ local ICB = {
     COLD_CONTAINER_DELAY_HOURS = 0.25,
     COLD_TRANSFER_GRACE_HOURS = 0.10,
     MIN_APPLY_RATIO = 0.01,
-    VERSION = "1.0.18",
+    VERSION = "1.1.0",
     DEBUG = false,
 }
 
