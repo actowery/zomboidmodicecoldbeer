@@ -28,13 +28,17 @@ local function readFile(path)
     return contents
 end
 
+local function buildMergeMarker()
+    return string.rep("<", 7)
+end
+
 local files = getTrackedFiles()
 local checked = 0
 
 for _, path in ipairs(files) do
     if path:match("%.lua$") or path:match("%.md$") or path:match("%.txt$") or path:match("%.json$") or path:match("%.yml$") then
         local contents = readFile(path)
-        assertTruthy(not contents:find("<<<<<<<", 1, true), "merge marker found in " .. path)
+        assertTruthy(not contents:find(buildMergeMarker(), 1, true), "merge marker found in " .. path)
 
         for line in (contents .. "\n"):gmatch("(.-)\n") do
             assertTruthy(not line:find("\t", 1, true), "tab character found in " .. path)
