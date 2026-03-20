@@ -5,6 +5,10 @@ local Config = IceColdBeerConfig
 Config.MOD_OPTIONS_ID = "icecoldbeer"
 Config.MIN_BONUS = 0
 Config.MAX_BONUS = 100
+Config.TAG_BETTER_COLD = "icecoldbeer:bettercold"
+Config.TAG_CATEGORY_PREFIX = "icecoldbeer:category/"
+Config.TAG_UNHAPPINESS_PREFIX = "icecoldbeer:unhappiness/"
+Config.TAG_BOREDOM_PREFIX = "icecoldbeer:boredom/"
 Config.MIN_TIMING_MINUTES = 0
 Config.MAX_TIMING_MINUTES = 720
 Config.COLD_CONTAINER_TYPES = {
@@ -82,6 +86,10 @@ local function trim(value)
     return tostring(value or ""):gsub("^%s+", ""):gsub("%s+$", "")
 end
 
+local function toLowerTrimmed(value)
+    return trim(value):lower()
+end
+
 local function warnInvalidOption(optionId, rawValue, reason, resolvedValue)
     Config._validationWarnings = Config._validationWarnings or {}
 
@@ -137,6 +145,109 @@ local function getOptions()
     end
 
     return nil
+end
+
+local function getItemTagStrings(item)
+    if not item or type(item.getTags) ~= "function" then
+        return {}
+    end
+
+    local ok, tags = pcall(item.getTags, item)
+    if not ok or not tags then
+        return {}
+    end
+
+    if tags.toArray then
+        local okArray, values = pcall(tags.toArray, tags)
+        if okArray and values then
+            local result = {}
+            for _, value in ipairs(values) do
+                table.insert(result, tostring(value))
+            end
+            return result
+        end
+    end
+
+    local result = {}
+    if tags.size and tags.get then
+        local okSize, size = pcall(tags.size, tags)
+        if okSize and type(size) == "number" then
+            for i = 0, size - 1 do
+                local okValue, value = pcall(tags.get, tags, i)
+                if okValue and value ~= nil then
+                    table.insert(result, tostring(value))
+                end
+            end
+        end
+    end
+
+    return result
+end
+
+local function getTaggedItemCompat(item)
+    local tags = getItemTagStrings(item)
+    if #tags == 0 then
+        return nil
+    end
+
+    local hasBetterCold = false
+    local categoryKey = nil
+    local taggedUnhappiness = nil
+    local taggedBoredom = nil
+
+    for _, rawTag in ipairs(tags) do
+        local tag = toLowerTrimmed(rawTag)
+        if tag == Config.TAG_BETTER_COLD then
+            hasBetterCold = true
+        elseif tag:find(Config.TAG_CATEGORY_PREFIX, 1, true) == 1 then
+            categoryKey = tag:sub(#Config.TAG_CATEGORY_PREFIX + 1)
+        elseif tag:find(Config.TAG_UNHAPPINESS_PREFIX, 1, true) == 1 then
+            taggedUnhappiness = tag:sub(#Config.TAG_UNHAPPINESS_PREFIX + 1)
+        elseif tag:find(Config.TAG_BOREDOM_PREFIX, 1, true) == 1 then
+            taggedBoredom = tag:sub(#Config.TAG_BOREDOM_PREFIX + 1)
+        end
+    end
+
+    if not hasBetterCold then
+        return nil
+    end
+
+    local categoryBonus = nil
+    if categoryKey and Config.DEFAULTS.categories[categoryKey] then
+        categoryBonus = Config.getCategoryBonus(categoryKey)
+    end
+
+    local baseUnhappiness = categoryBonus and categoryBonus.unhappiness or Config.DEFAULTS.custom.unhappiness
+    local baseBoredom = categoryBonus and categoryBonus.boredom or Config.DEFAULTS.custom.boredom
+
+    local explicitUnhappiness = nil
+    local explicitBoredom = nil
+
+    if taggedUnhappiness ~= nil then
+        explicitUnhappiness = parseBoundedInteger(
+            "tagged_unhappiness",
+            taggedUnhappiness,
+            baseUnhappiness,
+            Config.MIN_BONUS,
+            Config.MAX_BONUS
+        )
+    end
+
+    if taggedBoredom ~= nil then
+        explicitBoredom = parseBoundedInteger(
+            "tagged_boredom",
+            taggedBoredom,
+            baseBoredom,
+            Config.MIN_BONUS,
+            Config.MAX_BONUS
+        )
+    end
+
+    return {
+        unhappiness = explicitUnhappiness or baseUnhappiness,
+        boredom = explicitBoredom or baseBoredom,
+        categoryKey = categoryKey,
+    }
 end
 
 local function getOptionValue(options, optionId)
@@ -342,6 +453,32 @@ function Config.getBonusForItemType(fullType)
 
     if Config.isCustomTarget(fullType) then
         return Config.getCustomBonus(), { source = "custom", key = fullType }
+    end
+
+    return nil
+end
+
+function Config.getBonusForItem(item)
+    if not item then
+        return nil
+    end
+
+    local taggedBonus = getTaggedItemCompat(item)
+    if taggedBonus then
+        return {
+            unhappiness = taggedBonus.unhappiness,
+            boredom = taggedBonus.boredom,
+        }, {
+            source = "tag",
+            key = taggedBonus.categoryKey or Config.TAG_BETTER_COLD,
+        }
+    end
+
+    if type(item.getFullType) == "function" then
+        local ok, fullType = pcall(item.getFullType, item)
+        if ok and type(fullType) == "string" and fullType ~= "" then
+            return Config.getBonusForItemType(fullType)
+        end
     end
 
     return nil

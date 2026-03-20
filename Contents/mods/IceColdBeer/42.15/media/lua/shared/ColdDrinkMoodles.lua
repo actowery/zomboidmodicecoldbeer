@@ -411,16 +411,14 @@ local function clearDrinkSnapshot(item)
 end
 
 local function getBonusDefinition(item)
-    if not item or not Config or not Config.getBonusForItemType or type(item.getFullType) ~= "function" then
+    if not item or not Config or not Config.getBonusForItem then
         return nil
     end
 
-    local ok, fullType = pcall(item.getFullType, item)
-    if not ok or type(fullType) ~= "string" or fullType == "" then
+    local ok, bonus = pcall(Config.getBonusForItem, item)
+    if not ok then
         return nil
     end
-
-    local bonus = Config.getBonusForItemType(fullType)
     if not bonus then
         return nil
     end

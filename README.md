@@ -24,6 +24,11 @@ What it does:
 - Supports an advanced custom item-id allowlist for modded drinks
 - Includes English, Spanish, and Turkish tooltip translations
 
+Compatibility direction:
+- The next feature pass is focused on easier support for mods that add chillable drinks.
+- Pomp's and Vanilla Foods Expanded are current reference examples, but the goal is broader compatibility with mod-added beers and other cold drinks.
+- Third-party mod authors can now opt drinks in with Ice Cold Beer tags. See `MODDER_COMPAT.md`.
+
 Configurable cold bonus options:
 - Built-in drink groups have separate in-game boredom and unhappiness integer entry fields
 - Advanced users can add extra full item IDs, such as `SomeMod.FancySoda`, to a custom cold-target list
