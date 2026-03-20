@@ -170,6 +170,18 @@ local function getCurrentWorldHours()
     return nil
 end
 
+local function getTimingHours()
+    if Config and type(Config.getTimingHours) == "function" then
+        return Config.getTimingHours()
+    end
+
+    return {
+        coldContainerDelayHours = ICB.COLD_CONTAINER_DELAY_HOURS,
+        coldLingerHours = ICB.COLD_LINGER_HOURS,
+        coldTransferGraceHours = ICB.COLD_TRANSFER_GRACE_HOURS,
+    }
+end
+
 local function getItemModData(item)
     if not item then
         return nil
@@ -286,6 +298,7 @@ local function getColdContainerElapsedHours(item, options)
     local mutate = options.mutate ~= false
     local modData = getItemModData(item)
     local now = getCurrentWorldHours()
+    local timing = getTimingHours()
     if not modData or not now then
         return nil
     end
@@ -295,7 +308,7 @@ local function getColdContainerElapsedHours(item, options)
 
     if not isInPoweredColdContainer(item) then
         if mutate then
-            if not lastSeenHour or (now - lastSeenHour) > ICB.COLD_TRANSFER_GRACE_HOURS then
+            if not lastSeenHour or (now - lastSeenHour) > timing.coldTransferGraceHours then
                 clearColdContainerState(item)
             end
         end
@@ -357,6 +370,7 @@ end
 
 local function getColdContainerFallbackState(item, options)
     local elapsedHours = getColdContainerElapsedHours(item, options)
+    local timing = getTimingHours()
     if elapsedHours == nil then
         return {
             active = false,
@@ -369,10 +383,10 @@ local function getColdContainerFallbackState(item, options)
 
     return {
         active = true,
-        cold = elapsedHours >= ICB.COLD_CONTAINER_DELAY_HOURS,
-        chilling = elapsedHours < ICB.COLD_CONTAINER_DELAY_HOURS,
+        cold = elapsedHours >= timing.coldContainerDelayHours,
+        chilling = elapsedHours < timing.coldContainerDelayHours,
         elapsedHours = elapsedHours,
-        remainingHours = math.max(0, ICB.COLD_CONTAINER_DELAY_HOURS - elapsedHours),
+        remainingHours = math.max(0, timing.coldContainerDelayHours - elapsedHours),
     }
 end
 
@@ -421,6 +435,7 @@ end
 local function isWithinColdLinger(item)
     local modData = getItemModData(item)
     local now = getCurrentWorldHours()
+    local timing = getTimingHours()
     if not modData or not now then
         return false
     end
@@ -430,7 +445,7 @@ local function isWithinColdLinger(item)
         return false
     end
 
-    if (now - lastColdHour) > ICB.COLD_LINGER_HOURS then
+    if (now - lastColdHour) > timing.coldLingerHours then
         return false
     end
 

@@ -1,4 +1,4 @@
-name: Lua Tests
+name: CI
 
 on:
   push:
@@ -10,7 +10,7 @@ on:
   pull_request:
 
 jobs:
-  test-config:
+  checks:
     runs-on: ubuntu-latest
 
     steps:
@@ -25,8 +25,11 @@ jobs:
       - name: Show Lua version
         run: lua -v
 
-      - name: Run Lua tests
+      - name: Run repository checks
         run: |
+          lua tests/test_lua_syntax.lua
+          lua tests/test_lua_style.lua
+          lua tests/test_repository_integrity.lua
           lua tests/test_cold_drink_config.lua
           lua tests/test_cold_drink_moodles_state.lua
           lua tests/test_translations.lua

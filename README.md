@@ -37,13 +37,13 @@ Project layout:
 - Required shared folder: `Contents/mods/IceColdBeer/common`
 
 Local testing:
-- Active local mod path: `C:\Users\AT\Zomboid\mods\IceColdBeerLocal\42.15`
-- After editing files here, sync the updated contents into that local mod folder before testing in-game
+- Active live test path: `C:\Users\AT\Zomboid\Workshop\IceColdBeer\Contents\mods\IceColdBeer\42.15`
+- After editing files here, sync the updated contents into that Workshop folder before testing in-game
 - See `TESTING.md` for a quick smoke-test checklist and optional debug logging
 
 Notes:
 - This project follows the current Build 42 packaging guidance of using versioned mod folders and a `common` folder.
-- Current development version is `modversion=1.0.8` in `mod.info`.
+- Current development version is whatever `modversion` is set to in `Contents/mods/IceColdBeer/42.15/mod.info`.
 - Known issue: on the current Build 42 UI, the extra cold bonus tooltip values can appear slightly misaligned even though the tooltip logic and mood effects work correctly.
 - No open-source license has been added yet. All rights remain with the author unless you choose a license later.
 - This is an unofficial fan-made mod and is not affiliated with The Indie Stone.
@@ -51,4 +51,4 @@ Notes:
 Release workflow:
 - Use feature branches for new work and hotfix branches for urgent release fixes.
 - Before shipping, run the short release checklist in `TESTING.md`.
-- Basic Lua unit tests and a GitHub Actions workflow cover the shared config logic on this branch.
+- GitHub Actions runs syntax, style, repository integrity, config, moodle-state, and translation checks on pushes and pull requests.

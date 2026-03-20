@@ -150,10 +150,20 @@ end
 
 PZAPI = {
     ModOptions = {
+        _values = {},
         getOptions = function()
+            local values = PZAPI.ModOptions._values or {}
             return {
-                getOption = function()
-                    return nil
+                getOption = function(_, optionId)
+                    if values[optionId] == nil then
+                        return nil
+                    end
+
+                    return {
+                        getValue = function()
+                            return values[optionId]
+                        end,
+                    }
                 end,
             }
         end,
@@ -368,6 +378,42 @@ runTest("heat sourced linger still requires reduced heat", function()
 
     local state = Hooks.getColdState(item, { mutate = false })
     assertFalsey(state.cold, "heat-derived linger should fail when heat has fully normalized")
+end)
+
+runTest("configured timing options affect chill delay and linger behavior", function()
+    PZAPI.ModOptions._values = {
+        cold_container_delay_minutes = 30,
+        cold_linger_minutes = 30,
+        cold_transfer_grace_minutes = 3,
+    }
+
+    local parent = makeParent({ x = 20, y = 20, z = 0, objectIndex = 5, name = "Fridge" })
+    local container = makeContainer({ type = "fridge", powered = true, parent = parent })
+    local item = makeItem({ heat = 1.0, container = container, modData = {} })
+
+    worldHours = 70
+    local initialState = Hooks.getColdState(item, { mutate = true })
+    assertTruthy(initialState.chilling, "configured delay should begin in chilling state")
+
+    worldHours = 70.3
+    local preDelayState = Hooks.getColdState(item, { mutate = true })
+    assertFalsey(preDelayState.cold, "30-minute configured delay should not be cold after 18 minutes")
+    assertTruthy(preDelayState.chilling, "30-minute configured delay should still be chilling after 18 minutes")
+
+    worldHours = 70.6
+    local postDelayState = Hooks.getColdState(item, { mutate = true })
+    assertTruthy(postDelayState.cold, "30-minute configured delay should be cold after 36 minutes")
+
+    item._container = nil
+    worldHours = 71.0
+    local lingerState = Hooks.getColdState(item, { mutate = false })
+    assertTruthy(lingerState.cold, "30-minute linger should still be active after 24 minutes out of cold storage")
+
+    worldHours = 71.2
+    local expiredState = Hooks.getColdState(item, { mutate = false })
+    assertFalsey(expiredState.cold, "30-minute linger should expire after 72 minutes total elapsed")
+
+    PZAPI.ModOptions._values = {}
 end)
 
 io.write(string.format("Ice Cold Beer moodle-state tests passed (%d checks)\n", testCount))
