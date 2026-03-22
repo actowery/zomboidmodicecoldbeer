@@ -350,6 +350,25 @@ runTest("container sourced linger survives pickup briefly even without heat chan
     assertTruthy(state.cold, "recent container-derived cold should linger after pickup")
 end)
 
+runTest("removing an item after read-only cold detection seeds linger state", function()
+    local parent = makeParent({ x = 18, y = 10, z = 0, objectIndex = 3, name = "FridgeC" })
+    local container = makeContainer({ type = "fridge", powered = true, parent = parent })
+    local item = makeItem({ heat = 1.0, container = container, modData = {} })
+
+    worldHours = 44
+    Hooks.getColdState(item, { mutate = true })
+
+    worldHours = 44.3
+    local coldInFridge = Hooks.getColdState(item, { mutate = false })
+    assertTruthy(coldInFridge.cold, "read-only fridge evaluation should still report cold once delay passes")
+    assertEqual(item:getModData().icbLastColdHour, nil, "read-only cold check should not stamp linger memory directly")
+
+    item._container = nil
+    local removedState = Hooks.getColdState(item, { mutate = true })
+    assertTruthy(removedState.cold, "removing a read-only-detected cold item should seed linger state")
+    assertEqual(item:getModData().icbLastColdSource, "container", "removal should preserve container cold source for linger")
+end)
+
 runTest("container sourced linger expires after tuned sustain window", function()
     worldHours = 50
     local item = makeItem({

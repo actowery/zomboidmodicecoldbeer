@@ -9,7 +9,7 @@ local ICB = {
     COLD_CONTAINER_DELAY_HOURS = 0.25,
     COLD_TRANSFER_GRACE_HOURS = 0.10,
     MIN_APPLY_RATIO = 0.01,
-    VERSION = "1.1.0",
+    VERSION = "1.1.1",
     DEBUG = false,
 }
 
@@ -293,6 +293,22 @@ local function clearColdContainerState(item)
     modData.icbColdContainerLastSeenHour = nil
 end
 
+local function didColdContainerTrackingReachCold(item, now)
+    local modData = getItemModData(item)
+    local timing = getTimingHours()
+    now = now or getCurrentWorldHours()
+    if not modData or not now then
+        return false
+    end
+
+    local startHour = tonumber(modData.icbColdContainerStartHour)
+    if not startHour or now < startHour then
+        return false
+    end
+
+    return (now - startHour) >= timing.coldContainerDelayHours
+end
+
 local function getColdContainerElapsedHours(item, options)
     options = options or {}
     local mutate = options.mutate ~= false
@@ -305,9 +321,13 @@ local function getColdContainerElapsedHours(item, options)
 
     local startHour = tonumber(modData.icbColdContainerStartHour)
     local lastSeenHour = tonumber(modData.icbColdContainerLastSeenHour)
+    local lastColdHour = tonumber(modData.icbLastColdHour)
 
     if not isInPoweredColdContainer(item) then
         if mutate then
+            if didColdContainerTrackingReachCold(item, now) and (not lastSeenHour or not lastColdHour or lastColdHour < lastSeenHour) then
+                rememberColdState(item, "container")
+            end
             if not lastSeenHour or (now - lastSeenHour) > timing.coldTransferGraceHours then
                 clearColdContainerState(item)
             end
